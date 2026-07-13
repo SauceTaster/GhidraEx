@@ -1,0 +1,13 @@
+.vscode/**
+.vscode-test/**
+.gitignore
+coverage/**
+node_modules/**
+scripts/**
+src/**
+test-fixtures/**
+**/*.map
+dist/web-test/**
+esbuild.mjs
+tsconfig.json
+dist/*.vsix

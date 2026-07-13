@@ -1,0 +1,12 @@
+.DS_Store
+.gradle/
+.idea/
+.toolchains/
+**/.intellijPlatform/
+**/build/
+**/out/
+**/node_modules/
+**/dist/
+**/.vscode-test/
+**/.vscode-test-web/
+*.iml

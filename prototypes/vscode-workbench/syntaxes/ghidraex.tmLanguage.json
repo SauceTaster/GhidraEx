@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GhidraEx Listing",
+  "scopeName": "source.ghidraex-listing",
+  "patterns": [
+    {
+      "match": "^\\s*(0x[0-9a-fA-F]{8,16})",
+      "captures": {
+        "1": {
+          "name": "constant.numeric.hex.ghidraex"
+        }
+      }
+    },
+    {
+      "match": "\\b(?:[0-9a-fA-F]{2}\\s+){1,8}",
+      "name": "constant.numeric.byte.ghidraex"
+    },
+    {
+      "match": "\\b(?:push|pop|mov|movzx|lea|sub|add|xor|cmp|test|call|ret|jmp|ja|jne|je|rol|inc|dec|nop)\\b",
+      "name": "keyword.control.instruction.ghidraex"
+    },
+    {
+      "match": "\\b(?:rax|rbx|rcx|rdx|rsi|rdi|rsp|rbp|eax|ebx|ecx|edx|esi|edi)\\b",
+      "name": "variable.language.register.ghidraex"
+    },
+    {
+      "match": "\\b(?:FUN|LAB)_[0-9a-fA-F]+\\b|\\b(?:decode_packet|validate_crc|dispatch_command|parse_header|decrypt_payload)\\b",
+      "name": "entity.name.function.ghidraex"
+    },
+    {
+      "begin": ";",
+      "end": "$",
+      "name": "comment.line.semicolon.ghidraex"
+    }
+  ]
+}

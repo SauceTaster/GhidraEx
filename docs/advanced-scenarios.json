@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "orbit-controller-advanced-v1",
+  "requiredEventFields": [
+    "programId",
+    "programRevision",
+    "operationId"
+  ],
+  "globalInvariants": [
+    "Older revisions and superseded operations never replace newer UI state",
+    "Validation, preview, and pending approval are non-mutating",
+    "Agent-authored persistent markup is tagged SourceType.AI",
+    "A failed or cancelled atomic mutation leaves no partial program changes",
+    "Every committed agent mutation has evidence, approval, audit, and one named undo item"
+  ],
+  "fixtures": [
+    {
+      "id": "orbit-controller-v1",
+      "instructionCount": 100000,
+      "features": [
+        "parser-call-graph",
+        "complex-cfg",
+        "many-to-many-token-address-map",
+        "structure-friendly-memory",
+        "known-xrefs"
+      ]
+    },
+    {
+      "id": "orbit-controller-v2",
+      "instructionCount": 100000,
+      "features": [
+        "compatible-address-spaces",
+        "controlled-program-differences",
+        "exact-version-tracking-matches",
+        "ambiguous-version-tracking-matches"
+      ]
+    },
+    {
+      "id": "orbit-controller.trace",
+      "features": [
+        "two-threads",
+        "three-frames",
+        "six-snapshots",
+        "sparse-snapshot",
+        "changed-and-stale-state",
+        "static-mappings",
+        "deterministic-emulator-schedule"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "SYNC-01",
+      "priority": "P0",
+      "title": "Connected navigation and layered highlights",
+      "tags": ["navigation", "decompiler", "listing", "snapshot", "stale-result"],
+      "states": ["connected", "pinned", "locked", "stale", "cancelled", "failed"],
+      "faults": ["out-of-order-decompile", "decompile-timeout", "missing-high-function"],
+      "assertions": [
+        "Latest request wins after rapid navigation",
+        "Token and instruction selections map to the fixture address set in both directions",
+        "Pinned and locked views retain independent identity and freshness",
+        "Removing the agent highlight preserves other highlight owners"
+      ]
+    },
+    {
+      "id": "EDIT-01",
+      "priority": "P0",
+      "title": "Transactional type recovery and semantic propagation",
+      "tags": ["transaction", "undo", "datatype", "signature", "provenance"],
+      "states": ["preview", "invalid", "awaiting-approval", "applying", "committed", "rolled-back"],
+      "faults": ["duplicate-name", "type-size-conflict", "imported-type-conflict", "stale-decompile"],
+      "assertions": [
+        "Invalid and cancelled edits are non-mutating",
+        "Approved edits create one atomic undo item",
+        "All dependent views refresh from the committed revision",
+        "AI markup never silently overwrites user or imported markup"
+      ]
+    },
+    {
+      "id": "ASYNC-01",
+      "priority": "P0",
+      "title": "Import and analysis cancellation and recovery",
+      "tags": ["import", "analysis", "progress", "cancel", "retry"],
+      "states": ["queued", "running", "partial", "cancelling", "cancelled", "failed", "completed"],
+      "faults": ["raw-language-required", "analyzer-failure", "cancel-checkpoint", "program-close"],
+      "assertions": [
+        "Progress is monotonic and phase-labeled",
+        "Cancellation leaves an explicitly partial but valid model",
+        "Retry is idempotent and produces the deterministic completed model",
+        "Late events from closed, cancelled, or superseded operations are ignored"
+      ]
+    },
+    {
+      "id": "AGENT-01",
+      "priority": "P0",
+      "title": "Evidence-backed batch change plan",
+      "tags": ["agent", "evidence", "approval", "audit", "script", "stale-plan"],
+      "states": ["investigating", "proposing", "awaiting-approval", "stale", "executing", "committed", "failed"],
+      "faults": ["revision-race", "mid-batch-exception", "script-timeout", "undeclared-capability"],
+      "assertions": [
+        "Every claim and proposed row links to concrete evidence",
+        "A revision race blocks execution before a transaction opens",
+        "Partial approval changes only selected rows but commits atomically",
+        "Audit and undo describe the exact approved mutation",
+        "Read-only headless execution is not treated as an external-I/O sandbox"
+      ]
+    },
+    {
+      "id": "GRAPH-01",
+      "priority": "P1",
+      "title": "Semantic graph state versus layout state",
+      "tags": ["graph", "layout", "grouping", "overlay", "selection"],
+      "states": ["current", "stale", "refreshing", "relayout", "grouped", "node-limit-error"],
+      "faults": ["graph-node-cap", "cancel-layout", "cfg-change"],
+      "assertions": [
+        "Refresh preserves geometry while Relayout preserves semantic identity",
+        "Group and ungroup restore the fixture graph",
+        "Overlay ownership and lifetimes remain independent",
+        "Path-to-selection equals the fixture code-unit address set"
+      ]
+    },
+    {
+      "id": "DIFF-01",
+      "priority": "P1",
+      "title": "Program Diff and Version Tracking review",
+      "tags": ["diff", "version-tracking", "two-program", "filter", "merge"],
+      "states": ["available", "accepted", "rejected", "blocked", "implied", "markup-applied"],
+      "faults": ["incompatible-address-space", "ambiguous-match", "cancel-bulk-apply", "destination-revision-race"],
+      "assertions": [
+        "Program identities and merge direction remain visible",
+        "Accepting a match atomically blocks competitors",
+        "Ambiguous matches are never auto-applied",
+        "Clear and Undo restore destination markup and match state"
+      ]
+    },
+    {
+      "id": "TRACE-01",
+      "priority": "P1",
+      "title": "Debugger coordinates, time travel, and emulator-first changes",
+      "tags": ["debugger", "trace", "snapshot", "emulator", "live-target", "approval"],
+      "states": ["live", "paused", "past-snapshot", "stale-memory", "emulator", "write-disabled", "target-ended"],
+      "faults": ["stale-frame", "target-resume", "target-terminate", "unimplemented-userop", "timeout"],
+      "assertions": [
+        "Coordinate changes update dependent views atomically",
+        "Past, stale, changed, and unmapped values are distinguishable",
+        "Live writes require both the correct control mode and scoped approval",
+        "Target state is revalidated after approval",
+        "External target effects are never represented as safely undoable"
+      ]
+    },
+    {
+      "id": "DOCK-01",
+      "priority": "P1",
+      "title": "Persistent topology and agent-owned evidence workspace",
+      "tags": ["docking", "focus", "actions", "persistence", "agent-layout"],
+      "states": ["focused", "tabbed", "split", "detached", "hidden", "transient", "restored"],
+      "faults": ["offscreen-window", "missing-transient-provider", "display-topology-change"],
+      "assertions": [
+        "Exactly one focused provider owns local actions",
+        "Provider topology and split ratios round-trip within tolerance",
+        "Persistent and transient provider lifecycles remain distinct",
+        "Closing the agent workspace restores the user layout and focus"
+      ]
+    }
+  ]
+}

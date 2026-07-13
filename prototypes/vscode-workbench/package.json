@@ -1,0 +1,335 @@
+{
+  "name": "ghidraex-vscode-workbench",
+  "displayName": "GhidraEx Workbench Prototype",
+  "description": "A Code OSS-compatible reverse-engineering workbench prototype for desktop and web extension hosts.",
+  "version": "0.1.0",
+  "publisher": "ghidraex",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SauceTaster/GhidraEx.git",
+    "directory": "prototypes/vscode-workbench"
+  },
+  "homepage": "https://github.com/SauceTaster/GhidraEx#readme",
+  "bugs": {
+    "url": "https://github.com/SauceTaster/GhidraEx/issues"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "ghidra",
+    "reverse-engineering",
+    "disassembly",
+    "code-oss",
+    "vscodium"
+  ],
+  "main": "./dist/node/extension.js",
+  "browser": "./dist/web/extension.js",
+  "extensionKind": [
+    "workspace",
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:ghidraex.project",
+    "onView:ghidraex.symbols",
+    "onView:ghidraex.analysis",
+    "onView:ghidraex.evidence",
+    "onCommand:ghidraex.openWorkbench",
+    "onCommand:ghidraex.jumpToAddress",
+    "onCommand:ghidraex.searchSymbols",
+    "onCommand:ghidraex.startAnalysis",
+    "onCommand:ghidraex.cancelAnalysis"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "The synthetic workbench is available. A real browser-hosted Ghidra engine must be remote or WebAssembly-based."
+    },
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The synthetic read-only workbench is available. Future local engine launch and writes require trust.",
+      "restrictedConfigurations": [
+        "ghidraex.engine.endpoint"
+      ]
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ghidraex",
+          "title": "GhidraEx",
+          "icon": "media/ghidraex.svg"
+        }
+      ]
+    },
+    "views": {
+      "ghidraex": [
+        {
+          "id": "ghidraex.project",
+          "name": "Programs",
+          "icon": "$(folder-library)",
+          "contextualTitle": "GhidraEx Programs"
+        },
+        {
+          "id": "ghidraex.symbols",
+          "name": "Symbols",
+          "icon": "$(symbol-method)",
+          "contextualTitle": "GhidraEx Symbols"
+        },
+        {
+          "id": "ghidraex.analysis",
+          "name": "Analysis",
+          "icon": "$(pulse)",
+          "contextualTitle": "GhidraEx Analysis"
+        },
+        {
+          "id": "ghidraex.evidence",
+          "name": "Agent Evidence",
+          "icon": "$(references)",
+          "contextualTitle": "GhidraEx Agent Evidence"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "ghidraex.evidence",
+        "contents": "Evidence is read-only until a program location is selected.\n[Open the native workbench](command:ghidraex.openWorkbench)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ghidraex.openWorkbench",
+        "title": "Open Workbench",
+        "category": "GhidraEx",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "ghidraex.openListing",
+        "title": "Open Native Listing",
+        "category": "GhidraEx",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "ghidraex.openDecompiler",
+        "title": "Open Native Decompiler",
+        "category": "GhidraEx",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "ghidraex.jumpToAddress",
+        "title": "Jump to Address",
+        "category": "GhidraEx",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "ghidraex.searchSymbols",
+        "title": "Search Symbols",
+        "category": "GhidraEx",
+        "icon": "$(search)"
+      },
+      {
+        "command": "ghidraex.startAnalysis",
+        "title": "Start Analysis",
+        "category": "GhidraEx",
+        "icon": "$(play)"
+      },
+      {
+        "command": "ghidraex.cancelAnalysis",
+        "title": "Cancel Analysis",
+        "category": "GhidraEx",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "ghidraex.showXrefs",
+        "title": "Show References to Location",
+        "category": "GhidraEx",
+        "icon": "$(references)"
+      },
+      {
+        "command": "ghidraex.explainSelection",
+        "title": "Explain Selected Instruction",
+        "category": "GhidraEx",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "ghidraex.refreshViews",
+        "title": "Refresh Native Views",
+        "category": "GhidraEx",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "ghidraex.openLocation",
+        "title": "Open Location",
+        "category": "GhidraEx",
+        "icon": "$(go-to-file)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "ghidraex.cancelAnalysis",
+          "when": "ghidraex.analysisRunning"
+        },
+        {
+          "command": "ghidraex.openLocation",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "ghidraex.refreshViews",
+          "when": "view == ghidraex.project",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.searchSymbols",
+          "when": "view == ghidraex.symbols",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.startAnalysis",
+          "when": "view == ghidraex.analysis && !ghidraex.analysisRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.cancelAnalysis",
+          "when": "view == ghidraex.analysis && ghidraex.analysisRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.explainSelection",
+          "when": "view == ghidraex.evidence",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ghidraex.openLocation",
+          "when": "viewItem == ghidraex.symbol || viewItem == ghidraex.evidence || viewItem == ghidraex.section",
+          "group": "inline"
+        },
+        {
+          "command": "ghidraex.showXrefs",
+          "when": "viewItem == ghidraex.symbol || viewItem == ghidraex.evidence",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "ghidraex.openDecompiler",
+          "when": "resourceScheme == ghidraex-listing",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.openListing",
+          "when": "resourceScheme == ghidraex-decompiler",
+          "group": "navigation"
+        },
+        {
+          "command": "ghidraex.startAnalysis",
+          "when": "resourceScheme == ghidraex-listing && !ghidraex.analysisRunning",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "ghidraex.showXrefs",
+          "when": "resourceScheme == ghidraex-listing",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.explainSelection",
+          "when": "resourceScheme == ghidraex-listing || resourceScheme == ghidraex-decompiler",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "ghidraex.jumpToAddress",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g",
+        "when": "resourceScheme == ghidraex-listing || resourceScheme == ghidraex-decompiler"
+      },
+      {
+        "command": "ghidraex.showXrefs",
+        "key": "shift+f4",
+        "when": "resourceScheme == ghidraex-listing"
+      },
+      {
+        "command": "ghidraex.explainSelection",
+        "key": "ctrl+alt+e",
+        "mac": "cmd+alt+e",
+        "when": "resourceScheme == ghidraex-listing || resourceScheme == ghidraex-decompiler"
+      }
+    ],
+    "languages": [
+      {
+        "id": "ghidraex-listing",
+        "aliases": [
+          "GhidraEx Listing",
+          "gxasm"
+        ],
+        "extensions": [
+          ".gxasm"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ghidraex-listing",
+        "scopeName": "source.ghidraex-listing",
+        "path": "./syntaxes/ghidraex.tmLanguage.json"
+      }
+    ],
+    "configurationDefaults": {
+      "[ghidraex-listing]": {
+        "editor.wordWrap": "off",
+        "editor.lineNumbers": "off",
+        "editor.stickyScroll.enabled": false,
+        "editor.bracketPairColorization.enabled": false,
+        "editor.guides.indentation": false,
+        "editor.minimap.enabled": true
+      }
+    },
+    "configuration": {
+      "title": "GhidraEx",
+      "properties": {
+        "ghidraex.openOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the native Listing/Decompiler split and reveal the GhidraEx Activity Bar container when the extension host starts."
+        },
+        "ghidraex.engine.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "Reserved HTTPS endpoint for a future remote Ghidra engine."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "npm run check && node esbuild.mjs",
+    "package": "npm run check && node esbuild.mjs --production && vsce package --out dist/ghidraex-vscode-workbench-0.1.0.vsix",
+    "open:desktop": "npm run build && node scripts/launch-desktop.mjs",
+    "open:web": "npm run build && vscode-test-web --browserType=chromium --port=31048 --extensionDevelopmentPath=. test-fixtures",
+    "test:web": "npm run build && vscode-test-web --browserType=chromium --port=31047 --extensionDevelopmentPath=. --extensionTestsPath=dist/web-test/index.js test-fixtures"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.100.0",
+    "@vscode/test-web": "^0.0.78",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.6",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

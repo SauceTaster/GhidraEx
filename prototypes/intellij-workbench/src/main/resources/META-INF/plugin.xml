@@ -1,0 +1,67 @@
+<idea-plugin>
+    <id>dev.ghidraex.intellij-workbench</id>
+    <name>GhidraEx IntelliJ Workbench Prototype</name>
+    <vendor>GhidraEx</vendor>
+
+    <description><![CDATA[
+      A native IntelliJ Platform workbench experiment for a modern reverse-engineering UI.
+      It uses a synthetic engine behind a toolkit-neutral contract so that the interaction
+      model can be evaluated before connecting a Ghidra backend.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="dev.ghidraex.intellij.session.WorkbenchSession"/>
+        <postStartupActivity implementation="dev.ghidraex.intellij.startup.DemoWorkbenchStartupActivity"/>
+        <fileEditorProvider implementation="dev.ghidraex.intellij.editor.VirtualizedListingEditorProvider"/>
+
+        <toolWindow id="RE Projects"
+                    anchor="left"
+                    factoryClass="dev.ghidraex.intellij.toolwindow.ProjectsToolWindowFactory"/>
+        <toolWindow id="RE Symbols"
+                    anchor="left"
+                    secondary="true"
+                    factoryClass="dev.ghidraex.intellij.toolwindow.SymbolsToolWindowFactory"/>
+        <toolWindow id="RE Inspector"
+                    anchor="right"
+                    factoryClass="dev.ghidraex.intellij.toolwindow.InspectorToolWindowFactory"/>
+
+        <notificationGroup id="GhidraEx Analysis"
+                           displayType="BALLOON"
+                           isLogByDefault="true"/>
+    </extensions>
+
+    <actions>
+        <group id="dev.ghidraex.intellij.actions"
+               text="Reverse Engineering"
+               description="GhidraEx reverse-engineering workbench commands"
+               popup="true"
+               searchable="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+
+            <action id="dev.ghidraex.intellij.OpenSyntheticProgram"
+                    class="dev.ghidraex.intellij.action.OpenSyntheticProgramAction"
+                    text="Open Synthetic Program"
+                    description="Open the synthetic listing and decompiler in native editor tabs">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+                <abbreviation value="reopen"/>
+            </action>
+
+            <action id="dev.ghidraex.intellij.RunAnalysis"
+                    class="dev.ghidraex.intellij.action.RunAnalysisAction"
+                    text="Analyze Synthetic Program"
+                    description="Run cancellable synthetic analysis in the background">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift G"/>
+                <abbreviation value="reanalyze"/>
+            </action>
+
+            <action id="dev.ghidraex.intellij.GoToSelectedSymbol"
+                    class="dev.ghidraex.intellij.action.GoToSelectedSymbolAction"
+                    text="Go to Selected Symbol"
+                    description="Navigate the listing editor to the selected symbol">
+                <abbreviation value="regoto"/>
+            </action>
+        </group>
+    </actions>
+</idea-plugin>

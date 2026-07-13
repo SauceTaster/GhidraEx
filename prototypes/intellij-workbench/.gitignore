@@ -1,0 +1,13 @@
+.gradle/
+.idea/
+.intellijPlatform/
+build/
+out/
+
+# The bundled runIde fixture intentionally contains minimal IntelliJ metadata.
+!demo-project/.idea/
+!demo-project/.idea/.gitignore
+!demo-project/.idea/.name
+!demo-project/.idea/misc.xml
+!demo-project/.idea/modules.xml
+!demo-project/ghidraex-demo.iml
