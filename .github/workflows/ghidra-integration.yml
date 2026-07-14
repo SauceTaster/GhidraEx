@@ -14,7 +14,7 @@ on:
       - ".github/workflows/ghidra-integration.yml"
   push:
     branches:
-      - "**"
+      - main
     paths:
       - "integration/ghidra/**"
       - "integration/gateway/**"
@@ -27,7 +27,7 @@ permissions:
 
 concurrency:
   group: real-ghidra-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   real-ghidra:
