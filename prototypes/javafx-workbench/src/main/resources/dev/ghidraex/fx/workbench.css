@@ -461,6 +461,25 @@
     -fx-text-fill: -gx-amber;
 }
 
+.disassembly-cell:data .asm-mnemonic, .disassembly-cell:data .flow-marker {
+    -fx-text-fill: -gx-cyan;
+}
+
+.disassembly-cell:gap .label {
+    -fx-text-fill: -gx-faint;
+    -fx-font-style: italic;
+}
+
+.listing-freshness {
+    -fx-min-width: 76px;
+    -fx-alignment: center;
+}
+
+.query-state {
+    -fx-min-width: 72px;
+    -fx-alignment: center;
+}
+
 .function-badge {
     -fx-min-width: 24px;
     -fx-min-height: 24px;
@@ -553,6 +572,14 @@
 .xref-list {
     -fx-background-color: -gx-panel;
     -fx-padding: 8px;
+}
+
+.xref-pane {
+    -fx-background-color: -gx-panel;
+}
+
+.xref-status {
+    -fx-padding: 8px 9px 4px 9px;
 }
 
 .xref-list .list-cell {
@@ -764,4 +791,205 @@
 .scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
     -fx-shape: "";
     -fx-padding: 0;
+}
+
+/* Advanced debugger, scripting, backend, and extension surfaces. */
+.advanced-pane {
+    -fx-background-color: -gx-bg;
+}
+
+.advanced-toolbar {
+    -fx-min-height: 48px;
+    -fx-pref-height: 48px;
+    -fx-padding: 0 13px;
+}
+
+.advanced-heading {
+    -fx-font-size: 9px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #718092;
+}
+
+.advanced-subtitle {
+    -fx-font-size: 9px;
+    -fx-text-fill: -gx-faint;
+}
+
+.coordinate-label, .backend-path {
+    -fx-font-family: "SF Mono";
+    -fx-font-size: 9px;
+    -fx-text-fill: #7d8999;
+}
+
+.backend-path {
+    -fx-padding: 8px 10px;
+    -fx-background-color: #090d12;
+    -fx-border-color: -gx-border-soft;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: #8fa3b6;
+}
+
+.state-chip {
+    -fx-padding: 3px 7px;
+    -fx-background-color: rgba(110, 159, 255, 0.09);
+    -fx-border-color: rgba(110, 159, 255, 0.20);
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-text-fill: -gx-blue;
+    -fx-font-family: "SF Mono";
+    -fx-font-size: 8px;
+    -fx-font-weight: 800;
+}
+
+.state-chip.safe-chip {
+    -fx-background-color: rgba(119, 212, 155, 0.09);
+    -fx-border-color: rgba(119, 212, 155, 0.22);
+    -fx-text-fill: -gx-green;
+}
+
+.state-chip.warning-chip {
+    -fx-background-color: rgba(229, 181, 103, 0.10);
+    -fx-border-color: rgba(229, 181, 103, 0.25);
+    -fx-text-fill: -gx-amber;
+}
+
+.state-chip.error-chip {
+    -fx-background-color: rgba(255, 107, 129, 0.10);
+    -fx-border-color: rgba(255, 107, 129, 0.25);
+    -fx-text-fill: -gx-red;
+}
+
+.advanced-split {
+    -fx-background-color: -gx-border;
+    -fx-padding: 0;
+}
+
+.advanced-split > .split-pane-divider {
+    -fx-padding: 0 1px;
+    -fx-background-color: -gx-border;
+}
+
+.advanced-section {
+    -fx-background-color: #0c1016;
+}
+
+.advanced-section > .separator .line {
+    -fx-border-color: -gx-border-soft transparent transparent transparent;
+}
+
+.advanced-list, .extension-list {
+    -fx-background-color: #090d12;
+    -fx-background-insets: 0;
+    -fx-border-color: -gx-border-soft;
+}
+
+.advanced-list .list-cell, .extension-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #9da9b8;
+    -fx-font-family: "SF Mono";
+    -fx-font-size: 10px;
+    -fx-padding: 7px 9px;
+}
+
+.advanced-list .list-cell:selected {
+    -fx-background-color: rgba(82, 214, 210, 0.10);
+}
+
+.advanced-safety-bar {
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+    -fx-padding: 0 13px;
+    -fx-background-color: #11151c;
+    -fx-border-color: -gx-border transparent transparent transparent;
+}
+
+.safety-glyph {
+    -fx-min-width: 24px;
+    -fx-min-height: 24px;
+    -fx-alignment: center;
+    -fx-background-color: rgba(82, 214, 210, 0.08);
+    -fx-background-radius: 12px;
+    -fx-text-fill: -gx-cyan;
+}
+
+.runtime-picker {
+    -fx-background-color: #111720;
+    -fx-border-color: -gx-border;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.runtime-picker > .list-cell {
+    -fx-text-fill: #aab6c4;
+    -fx-font-size: 10px;
+}
+
+.script-editor, .script-output {
+    -fx-font-family: "SF Mono";
+    -fx-font-size: 11px;
+    -fx-text-fill: #c6d0dc;
+    -fx-prompt-text-fill: -gx-faint;
+    -fx-background-color: #090d12;
+    -fx-border-color: -gx-border-soft;
+}
+
+.script-output {
+    -fx-text-fill: #83bba9;
+}
+
+.script-editor .content, .script-output .content {
+    -fx-background-color: #090d12;
+}
+
+.backend-card {
+    -fx-background-color: linear-gradient(to bottom right, #141a23, #0f141b);
+    -fx-border-color: transparent transparent -gx-border transparent;
+}
+
+.extension-list .list-cell {
+    -fx-padding: 0;
+    -fx-border-color: transparent transparent -gx-border-soft transparent;
+}
+
+.extension-row {
+    -fx-min-height: 64px;
+    -fx-padding: 9px 11px;
+}
+
+.extension-active, .extension-idle {
+    -fx-min-width: 28px;
+    -fx-min-height: 28px;
+    -fx-alignment: center;
+    -fx-background-radius: 14px;
+    -fx-font-weight: 900;
+}
+
+.extension-active {
+    -fx-background-color: rgba(119, 212, 155, 0.10);
+    -fx-text-fill: -gx-green;
+}
+
+.extension-idle {
+    -fx-background-color: rgba(127, 137, 153, 0.08);
+    -fx-text-fill: -gx-faint;
+}
+
+.extension-name {
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #cbd4df;
+}
+
+.extension-capabilities, .extension-status {
+    -fx-font-family: "SF Mono";
+    -fx-font-size: 8.5px;
+}
+
+.extension-capabilities {
+    -fx-text-fill: #657487;
+}
+
+.extension-status {
+    -fx-text-fill: #88a5b4;
 }

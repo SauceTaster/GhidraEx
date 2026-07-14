@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/event.schema.json",
+  "title": "GhidraEx protocol v1 event envelope",
+  "type": "object",
+  "required": ["kind", "version", "event", "sequence", "data"],
+  "properties": {
+    "kind": {"const": "event"},
+    "version": {"const": 1},
+    "event": {"$ref": "common.schema.json#/$defs/eventName"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "context": {"$ref": "common.schema.json#/$defs/programContext"},
+    "data": {"type": "object"}
+  },
+  "additionalProperties": false
+}

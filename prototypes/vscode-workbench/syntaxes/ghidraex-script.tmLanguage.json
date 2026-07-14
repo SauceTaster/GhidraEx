@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "GhidraEx Command Script",
+  "scopeName": "source.ghidraex-script",
+  "patterns": [
+    {
+      "name": "comment.line.number-sign.ghidraex-script",
+      "match": "#.*$"
+    },
+    {
+      "name": "keyword.control.ghidraex-script",
+      "match": "\\b(help|program|location|goto|decompile|xrefs|evidence|analyze|backend|capabilities|plugins|clear|exit|quit)\\b"
+    },
+    {
+      "name": "constant.numeric.hex.ghidraex-script",
+      "match": "\\b0[xX][0-9a-fA-F_]+\\b"
+    },
+    {
+      "name": "string.quoted.double.ghidraex-script",
+      "begin": "\"",
+      "end": "\""
+    }
+  ]
+}

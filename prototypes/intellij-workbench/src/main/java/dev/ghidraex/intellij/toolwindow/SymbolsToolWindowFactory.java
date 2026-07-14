@@ -4,22 +4,22 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.table.JBTable;
 import com.intellij.ui.SearchTextField;
 import com.intellij.util.ui.JBUI;
 import dev.ghidraex.engine.SymbolDescriptor;
-import dev.ghidraex.engine.SymbolMatcher;
 import dev.ghidraex.intellij.action.GoToSelectedSymbolAction;
 import dev.ghidraex.intellij.action.RunAnalysisAction;
 import dev.ghidraex.intellij.session.SessionListener;
 import dev.ghidraex.intellij.session.WorkbenchSession;
+import dev.ghidraex.intellij.read.ReadModels;
+import dev.ghidraex.viewstate.ContextualReadSlot;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.ListSelectionModel;
 import javax.swing.JPanel;
-import javax.swing.RowFilter;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableRowSorter;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
@@ -32,16 +32,13 @@ public final class SymbolsToolWindowFactory implements ToolWindowFactory {
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
         var session = WorkbenchSession.getInstance(project);
-        var model = new SymbolTableModel(session.symbols());
+        var model = new SymbolTableModel(List.of());
         var table = new JBTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setStriped(true);
         table.setShowGrid(false);
-        var sorter = new TableRowSorter<>(model);
-        table.setRowSorter(sorter);
         table.getColumnModel().getColumn(0).setPreferredWidth(170);
         table.getColumnModel().getColumn(1).setPreferredWidth(90);
-        table.setRowSelectionInterval(0, 0);
 
         table.getSelectionModel().addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting() && table.getSelectedRow() >= 0) {
@@ -58,21 +55,17 @@ public final class SymbolsToolWindowFactory implements ToolWindowFactory {
             }
         });
 
+        var status = new JBLabel();
+        status.setBorder(JBUI.Borders.empty(5, 6, 0, 6));
         project.getMessageBus().connect(project).subscribe(SessionListener.TOPIC, changed -> {
-            model.replace(changed.symbols());
+            apply(changed.symbolsRead(), model, table, status);
         });
 
         var search = new SearchTextField(false);
         search.getTextEditor().getEmptyText().setText("Search name, address, kind, or signature");
         search.getTextEditor().getDocument().addDocumentListener(new DocumentListener() {
             private void updateFilter() {
-                String query = search.getText();
-                sorter.setRowFilter(new RowFilter<>() {
-                    @Override
-                    public boolean include(Entry<? extends SymbolTableModel, ? extends Integer> entry) {
-                        return SymbolMatcher.matches(model.symbolAt(entry.getIdentifier()), query);
-                    }
-                });
+                session.requestSymbols(search.getText());
             }
 
             @Override
@@ -95,8 +88,10 @@ public final class SymbolsToolWindowFactory implements ToolWindowFactory {
         var searchContainer = new JPanel(new BorderLayout());
         searchContainer.setBorder(JBUI.Borders.empty(6));
         searchContainer.add(search, BorderLayout.CENTER);
+        searchContainer.add(status, BorderLayout.SOUTH);
         content.add(searchContainer, BorderLayout.NORTH);
         content.add(new JBScrollPane(table), BorderLayout.CENTER);
+        apply(session.symbolsRead(), model, table, status);
 
         ToolWindowSupport.install(
                 toolWindow,
@@ -105,6 +100,27 @@ public final class SymbolsToolWindowFactory implements ToolWindowFactory {
                 GoToSelectedSymbolAction.ID,
                 RunAnalysisAction.ID
         );
+    }
+
+    private static void apply(
+            ContextualReadSlot.Snapshot<ReadModels.SymbolQuery, ReadModels.SymbolCatalog> snapshot,
+            SymbolTableModel model,
+            JBTable table,
+            JBLabel status) {
+        status.setText(snapshot.freshness() + " · generation "
+                + snapshot.context().contentGeneration() + " · " + snapshot.detail());
+        if (snapshot.displayed() == null) {
+            if (snapshot.freshness() == ContextualReadSlot.Freshness.EMPTY
+                    || snapshot.freshness() == ContextualReadSlot.Freshness.FAILED
+                    || snapshot.freshness() == ContextualReadSlot.Freshness.RESYNCING) {
+                model.replace(List.of());
+            }
+            return;
+        }
+        model.replace(snapshot.displayed().value().symbols());
+        if (model.getRowCount() > 0 && table.getSelectedRow() < 0) {
+            table.setRowSelectionInterval(0, 0);
+        }
     }
 
     private static final class SymbolTableModel extends AbstractTableModel {
@@ -120,7 +136,11 @@ public final class SymbolsToolWindowFactory implements ToolWindowFactory {
         }
 
         void replace(List<SymbolDescriptor> replacement) {
-            symbols = List.copyOf(replacement);
+            List<SymbolDescriptor> safe = List.copyOf(replacement);
+            if (symbols.equals(safe)) {
+                return;
+            }
+            symbols = safe;
             fireTableDataChanged();
         }
 

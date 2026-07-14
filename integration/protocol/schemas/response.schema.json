@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/response.schema.json",
+  "title": "GhidraEx protocol v1 response envelope",
+  "type": "object",
+  "required": ["kind", "version", "id", "method", "ok"],
+  "properties": {
+    "kind": {"const": "response"},
+    "version": {"const": 1},
+    "id": {"$ref": "common.schema.json#/$defs/requestId"},
+    "method": {"$ref": "common.schema.json#/$defs/methodName"},
+    "ok": {"type": "boolean"},
+    "context": {"$ref": "common.schema.json#/$defs/programContext"},
+    "result": {"type": "object"},
+    "error": {"$ref": "common.schema.json#/$defs/error"}
+  },
+  "oneOf": [
+    {
+      "properties": {"ok": {"const": true}, "result": true, "error": false},
+      "required": ["result"]
+    },
+    {
+      "properties": {"ok": {"const": false}, "result": false, "error": true},
+      "required": ["error"]
+    }
+  ],
+  "additionalProperties": false
+}

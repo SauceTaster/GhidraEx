@@ -1,25 +1,56 @@
 package ex.ghidra.web;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SyntheticEngineTest {
+    @TempDir
+    Path temporaryDirectory;
+
     @Test
     void returnsCoarseImmutableViewportData() {
-        try (SyntheticEngine engine = new SyntheticEngine()) {
+        try (SyntheticEngine engine = new SyntheticEngine(Map.of())) {
             var snapshot = engine.snapshot();
             assertEquals(1, snapshot.apiVersion());
             assertEquals("quartz-agent", snapshot.project().binary());
+            assertEquals("synthetic-fixture", snapshot.backend().mode());
             assertEquals(100_000, snapshot.listingInfo().totalInstructions());
             assertEquals(50, snapshot.listing().size());
             assertEquals(50, snapshot.listingInfo().viewportRows());
             assertThrows(UnsupportedOperationException.class, () -> snapshot.listing().clear());
             assertTrue(snapshot.decompiler().contains("transport_send"));
         }
+    }
+
+    @Test
+    void backendDiscoveryNeverLabelsAnAbsentGhidraInstallAsReady() {
+        var backend = SyntheticEngine.discoverBackend(Map.of());
+
+        assertEquals("not-configured", backend.health());
+        assertEquals("synthetic-fixture", backend.mode());
+        assertTrue(backend.launcher().contains("GHIDRA_HOME"));
+    }
+
+    @Test
+    void backendDiscoveryReportsARealLauncherAsDetectedButNotConnected() throws Exception {
+        Path support = Files.createDirectories(temporaryDirectory.resolve("support"));
+        Path launcher = support.resolve("analyzeHeadless");
+        Files.writeString(launcher, "#!/bin/sh\n");
+        assertTrue(launcher.toFile().setExecutable(true));
+
+        var backend = SyntheticEngine.discoverBackend(Map.of("GHIDRA_HOME", temporaryDirectory.toString()));
+
+        assertEquals("detected", backend.health());
+        assertEquals("ghidra-headless", backend.mode());
+        assertTrue(backend.capabilities().isEmpty());
     }
 
     @Test

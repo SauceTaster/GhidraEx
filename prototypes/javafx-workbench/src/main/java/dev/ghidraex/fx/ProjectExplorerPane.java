@@ -1,8 +1,8 @@
 package dev.ghidraex.fx;
 
-import dev.ghidraex.engine.AnalysisEngine;
+import dev.ghidraex.engine.ProgramInfo;
 import dev.ghidraex.engine.Symbol;
-import javafx.collections.FXCollections;
+import dev.ghidraex.viewstate.ContextualReadSlot.Snapshot;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -20,15 +20,22 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 import java.util.function.Consumer;
 
-final class ProjectExplorerPane extends VBox {
-    private final AnalysisEngine engine;
+final class ProjectExplorerPane extends VBox implements AutoCloseable {
+    private final ProgramInfo program;
+    private final AsyncEngineReads.ReadHandle<AsyncEngineReads.SymbolQuery, AsyncEngineReads.SymbolSearchResult>
+            symbolReads;
     private final TextField symbolSearch = new TextField();
     private final ListView<Symbol> symbolResults = new ListView<>();
+    private final Label symbolState = new Label("● EMPTY");
+    private final Label symbolCount = new Label("No query");
+    private final Label symbolPlaceholder = new Label("Loading symbols…");
     private final TabPane tabs = new TabPane();
     private Consumer<Symbol> symbolListener = ignored -> { };
+    private String displayedResultId = "";
 
-    ProjectExplorerPane(AnalysisEngine engine) {
-        this.engine = engine;
+    ProjectExplorerPane(ProgramInfo program, AsyncEngineReads reads) {
+        this.program = java.util.Objects.requireNonNull(program, "program");
+        symbolReads = java.util.Objects.requireNonNull(reads, "reads").openSymbolSearch(this::applySymbols);
         getStyleClass().add("project-explorer");
         setMinWidth(190);
         setPrefWidth(292);
@@ -55,7 +62,7 @@ final class ProjectExplorerPane extends VBox {
         Label mark = new Label("N");
         mark.getStyleClass().add("project-mark");
         VBox titles = new VBox(1);
-        Label title = new Label(engine.program().projectName());
+        Label title = new Label(program.projectName());
         title.getStyleClass().add("project-title");
         Label subtitle = new Label("LOCAL PROJECT · 1 PROGRAM");
         subtitle.getStyleClass().add("eyebrow");
@@ -67,7 +74,7 @@ final class ProjectExplorerPane extends VBox {
     }
 
     private Tab buildProjectTab() {
-        TreeItem<String> root = new TreeItem<>(engine.program().binaryName());
+        TreeItem<String> root = new TreeItem<>(program.binaryName());
         root.setExpanded(true);
         TreeItem<String> memory = new TreeItem<>("Memory");
         memory.getChildren().setAll(List.of(
@@ -93,7 +100,7 @@ final class ProjectExplorerPane extends VBox {
     private Tab buildSymbolsTab() {
         symbolSearch.setPromptText("Filter names or addresses");
         symbolSearch.getStyleClass().add("sidebar-search");
-        symbolSearch.textProperty().addListener((observable, oldValue, value) -> updateSymbols());
+        symbolSearch.textProperty().addListener((observable, oldValue, value) -> requestSymbols());
         symbolSearch.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.DOWN) {
                 symbolResults.requestFocus();
@@ -108,6 +115,7 @@ final class ProjectExplorerPane extends VBox {
         symbolResults.getStyleClass().add("symbol-results");
         symbolResults.setFixedCellSize(44);
         symbolResults.setCellFactory(ignored -> new SymbolCell());
+        symbolResults.setPlaceholder(symbolPlaceholder);
         symbolResults.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
                 activateSelected();
@@ -119,20 +127,62 @@ final class ProjectExplorerPane extends VBox {
                 event.consume();
             }
         });
-        updateSymbols();
+        symbolState.getStyleClass().addAll("state-chip", "query-state");
+        symbolCount.getStyleClass().add("muted-label");
+        HBox readStatus = new HBox(7, symbolCount, symbolState);
+        readStatus.setAlignment(Pos.CENTER_RIGHT);
+        HBox.setHgrow(symbolCount, Priority.ALWAYS);
+        requestSymbols();
 
         Label hint = new Label("↵  OPEN SYMBOL");
         hint.getStyleClass().add("sidebar-hint");
-        VBox content = new VBox(8, symbolSearch, symbolResults, hint);
+        VBox content = new VBox(8, symbolSearch, readStatus, symbolResults, hint);
         content.getStyleClass().add("symbols-pane");
         VBox.setVgrow(symbolResults, Priority.ALWAYS);
         return new Tab("SYMBOLS", content);
     }
 
-    private void updateSymbols() {
-        symbolResults.setItems(FXCollections.observableArrayList(engine.searchSymbols(symbolSearch.getText(), 100)));
-        if (!symbolResults.getItems().isEmpty()) {
-            symbolResults.getSelectionModel().selectFirst();
+    private void requestSymbols() {
+        symbolReads.submit(AsyncEngineReads.SymbolQuery.from(symbolSearch.getText()));
+    }
+
+    private void applySymbols(
+            Snapshot<AsyncEngineReads.SymbolQuery, AsyncEngineReads.SymbolSearchResult> snapshot) {
+        ReadStatePresentation.apply(symbolState, symbolResults, snapshot, "Symbol search results");
+        symbolPlaceholder.setText(switch (snapshot.freshness()) {
+            case LOADING -> "Loading symbols…";
+            case FAILED -> "Symbol search failed";
+            case RESYNCING -> "Waiting for a validated program snapshot";
+            default -> "No matching symbols";
+        });
+
+        var displayed = snapshot.displayed();
+        if (displayed == null) {
+            if (!displayedResultId.isEmpty()) {
+                displayedResultId = "";
+                symbolResults.getItems().clear();
+            }
+            symbolCount.setText(snapshot.freshness() == dev.ghidraex.viewstate.ContextualReadSlot.Freshness.LOADING
+                    ? "Loading ≤ " + AsyncEngineReads.MAX_SYMBOL_RESULTS
+                    : "No symbols");
+            return;
+        }
+
+        int size = displayed.value().symbols().size();
+        symbolCount.setText(size + (displayed.completeness()
+                == dev.ghidraex.viewstate.ContextualReadSlot.Completeness.COMPLETE
+                ? " symbols"
+                : "+ symbols · capped"));
+        if (!displayed.resultId().equals(displayedResultId)) {
+            Symbol selected = symbolResults.getSelectionModel().getSelectedItem();
+            displayedResultId = displayed.resultId();
+            symbolResults.getItems().setAll(displayed.value().symbols());
+            int selectedIndex = selected == null ? -1 : symbolResults.getItems().indexOf(selected);
+            if (selectedIndex >= 0) {
+                symbolResults.getSelectionModel().select(selectedIndex);
+            } else if (!symbolResults.getItems().isEmpty()) {
+                symbolResults.getSelectionModel().selectFirst();
+            }
         }
     }
 
@@ -141,6 +191,11 @@ final class ProjectExplorerPane extends VBox {
         if (symbol != null) {
             symbolListener.accept(symbol);
         }
+    }
+
+    @Override
+    public void close() {
+        symbolReads.close();
     }
 
     private static final class SymbolCell extends ListCell<Symbol> {

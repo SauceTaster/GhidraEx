@@ -217,7 +217,7 @@ public final class WorkbenchServer implements AutoCloseable {
     }
 
     private static int parsePort(String[] args) {
-        int port = 8787;
+        int port = 18_787;
         for (String argument : args) {
             if (argument.startsWith("--port=")) {
                 port = Integer.parseInt(argument.substring("--port=".length()));

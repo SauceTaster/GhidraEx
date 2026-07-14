@@ -1,1 +1,3 @@
 rootProject.name = 'ghidra-fx-workbench'
+
+includeBuild('../../integration/view-state/java')

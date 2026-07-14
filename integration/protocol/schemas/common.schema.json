@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/common.schema.json",
+  "title": "GhidraEx protocol v1 common definitions",
+  "$defs": {
+    "requestId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "methodName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "eventName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "address": {
+      "description": "Canonical engine address. Clients treat this string as opaque.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "cursor": {
+      "description": "Opaque, query-bound, session-local paging cursor.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "programContext": {
+      "type": "object",
+      "required": ["programId", "revision"],
+      "properties": {
+        "programId": {"$ref": "#/$defs/opaqueId"},
+        "revision": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "protocolRange": {
+      "type": "object",
+      "required": ["min", "max"],
+      "properties": {
+        "min": {"type": "integer", "minimum": 1},
+        "max": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "instanceId": {"$ref": "#/$defs/opaqueId"}
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "maxFrameBytes",
+        "maxTimeoutMs",
+        "maxListingItems",
+        "maxSymbolItems",
+        "maxReferenceItems",
+        "maxDecompileChars"
+      ],
+      "properties": {
+        "maxFrameBytes": {"type": "integer", "minimum": 65536, "maximum": 2097152},
+        "maxTimeoutMs": {"type": "integer", "minimum": 100, "maximum": 30000},
+        "maxListingItems": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "maxSymbolItems": {"type": "integer", "minimum": 1, "maximum": 500},
+        "maxReferenceItems": {"type": "integer", "minimum": 1, "maximum": 2000},
+        "maxDecompileChars": {"type": "integer", "minimum": 1024, "maximum": 500000}
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["methods", "events", "transports", "limits"],
+      "properties": {
+        "methods": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/methodName"}
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/eventName"}
+        },
+        "transports": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {"enum": ["stdio", "loopback-http"]}
+        },
+        "limits": {"$ref": "#/$defs/limits"}
+      },
+      "additionalProperties": false
+    },
+    "errorCode": {
+      "enum": [
+        "INVALID_REQUEST",
+        "UNSUPPORTED_VERSION",
+        "AUTH_FAILED",
+        "METHOD_NOT_FOUND",
+        "INVALID_PARAMS",
+        "SESSION_NOT_READY",
+        "PROGRAM_MISMATCH",
+        "REVISION_MISMATCH",
+        "NOT_FOUND",
+        "LIMIT_EXCEEDED",
+        "DEADLINE_EXCEEDED",
+        "REQUEST_CANCELLED",
+        "ENGINE_BUSY",
+        "ENGINE_UNAVAILABLE",
+        "GHIDRA_FAILURE",
+        "INTERNAL"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {"$ref": "#/$defs/errorCode"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "retryable": {"type": "boolean"},
+        "retryAfterMs": {"type": "integer", "minimum": 0, "maximum": 30000},
+        "details": {"type": "object", "maxProperties": 32}
+      },
+      "additionalProperties": false
+    }
+  }
+}

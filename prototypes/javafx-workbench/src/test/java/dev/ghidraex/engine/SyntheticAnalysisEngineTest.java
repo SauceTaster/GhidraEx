@@ -45,4 +45,15 @@ class SyntheticAnalysisEngineTest {
             assertTrue(job.isCancelled());
         }
     }
+
+    @Test
+    void decompilerAndReferenceFixtureReadsHonorTheirBounds() {
+        try (var engine = new SyntheticAnalysisEngine()) {
+            assertEquals(5, engine.decompile("parse_packet", 5).size());
+            assertTrue(engine.decompile("parse_packet", 0).isEmpty());
+            long address = engine.program().imageBase() + 0x40;
+            assertEquals(2, engine.references(address, 2).size());
+            assertTrue(engine.references(address, 0).isEmpty());
+        }
+    }
 }

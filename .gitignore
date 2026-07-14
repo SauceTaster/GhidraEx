@@ -9,4 +9,6 @@
 **/dist/
 **/.vscode-test/
 **/.vscode-test-web/
+**/__pycache__/
+*.py[cod]
 *.iml

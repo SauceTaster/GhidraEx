@@ -1,0 +1,85 @@
+name: Real Ghidra integration
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 9 * * 1"
+  pull_request:
+    paths:
+      - "integration/ghidra/**"
+      - "integration/gateway/**"
+      - "integration/protocol/**"
+      - "scripts/verify-all.sh"
+      - ".github/workflows/ghidra-integration.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "integration/ghidra/**"
+      - "integration/gateway/**"
+      - "integration/protocol/**"
+      - "scripts/verify-all.sh"
+      - ".github/workflows/ghidra-integration.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-ghidra-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-ghidra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GHIDRA_VERSION: "12.1.2"
+      GHIDRA_BUILD: "20260605"
+      GHIDRA_SHA256: "b62e81a0390618466c019c60d8c2f796ced2509c4c1aea4a37644a77272cf99d"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Ghidra JDK 21
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Cache official Ghidra archive
+        id: cache-ghidra
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ghidra.zip
+          key: ghidra-${{ runner.os }}-${{ env.GHIDRA_VERSION }}-${{ env.GHIDRA_BUILD }}-${{ env.GHIDRA_SHA256 }}
+
+      - name: Download official Ghidra release
+        if: steps.cache-ghidra.outputs.cache-hit != 'true'
+        run: |
+          curl --fail --location --retry 4 --retry-all-errors \
+            --output "$RUNNER_TEMP/ghidra.zip" \
+            "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${GHIDRA_VERSION}_build/ghidra_${GHIDRA_VERSION}_PUBLIC_${GHIDRA_BUILD}.zip"
+
+      - name: Verify and extract Ghidra
+        run: |
+          echo "$GHIDRA_SHA256  $RUNNER_TEMP/ghidra.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/ghidra.zip" -d "$RUNNER_TEMP/ghidra"
+          echo "GHIDRA_HOME=$RUNNER_TEMP/ghidra/ghidra_${GHIDRA_VERSION}_PUBLIC" >> "$GITHUB_ENV"
+          echo "GHIDRA_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
+      - name: Verify the real bridge
+        run: |
+          test -x "$GHIDRA_HOME/support/analyzeHeadless"
+          command -v cc
+          python3 integration/ghidra/ghidra_bridge.py doctor
+          python3 -W error::ResourceWarning -m unittest discover -s integration/protocol/tests -v
+          python3 -W error::ResourceWarning -m unittest discover -s integration/ghidra/tests -v
+          python3 -W error::ResourceWarning -m unittest discover -s integration/gateway/tests -v

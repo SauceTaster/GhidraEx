@@ -18,8 +18,7 @@ public final class SyntheticAnalysisEngine implements AnalysisEngine {
     public static final long IMAGE_BASE = 0x0040_1000L;
     public static final int INSTRUCTION_COUNT = 100_000;
 
-    private final Duration stepDelay;
-    private final ProgramDescriptor program = new ProgramDescriptor(
+    private static final ProgramDescriptor DEMO_PROGRAM = new ProgramDescriptor(
             PROGRAM_ID,
             "orbit-controller.bin",
             "x86:LE:64:default",
@@ -27,8 +26,14 @@ public final class SyntheticAnalysisEngine implements AnalysisEngine {
             0x2A_000L
     );
 
+    private static final SymbolDescriptor ENTRY_SYMBOL =
+            symbol("entry", IMAGE_BASE, FUNCTION, 7, "void entry(void)");
+
+    private final Duration stepDelay;
+    private final ProgramDescriptor program = DEMO_PROGRAM;
+
     private final List<SymbolDescriptor> initialSymbols = List.of(
-            symbol("entry", 0x0040_1000L, FUNCTION, 7, "void entry(void)"),
+            ENTRY_SYMBOL,
             symbol("init_board", 0x0040_1060L, FUNCTION, 4, "int init_board(board_t *board)"),
             symbol("process_frame", 0x0040_1120L, FUNCTION, 18, "int process_frame(uint8_t *frame, size_t len)"),
             symbol("crc16", 0x0040_1240L, FUNCTION, 11, "uint16_t crc16(const uint8_t *data, size_t len)"),
@@ -46,6 +51,16 @@ public final class SyntheticAnalysisEngine implements AnalysisEngine {
 
     public static SyntheticAnalysisEngine interactive() {
         return new SyntheticAnalysisEngine(Duration.ofMillis(32));
+    }
+
+    /** Immutable bootstrap identity; obtaining it performs no provider read. */
+    public static ProgramDescriptor demoProgram() {
+        return DEMO_PROGRAM;
+    }
+
+    /** Immutable bootstrap location; obtaining it performs no provider read. */
+    public static SymbolDescriptor entrySymbol() {
+        return ENTRY_SYMBOL;
     }
 
     @Override

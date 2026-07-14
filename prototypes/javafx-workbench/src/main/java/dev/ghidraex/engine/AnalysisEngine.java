@@ -20,7 +20,11 @@ public interface AnalysisEngine extends AutoCloseable {
 
     List<Symbol> searchSymbols(String query, int limit);
 
-    List<String> decompile(String symbolName);
+    /** Returns at most {@code maxLines} immutable decompiler lines. */
+    List<String> decompile(String symbolName, int maxLines);
+
+    /** Returns at most {@code limit} references touching {@code address}. */
+    List<Reference> references(long address, int limit);
 
     AnalysisJob startAnalysis(Consumer<AnalysisProgress> progressListener);
 

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "ex.ghidra.prototype"
-version = "0.1.0"
+version = providers.gradleProperty("releaseVersion").orElse("0.1.0-SNAPSHOT").get()
 
 repositories {
     mavenCentral()

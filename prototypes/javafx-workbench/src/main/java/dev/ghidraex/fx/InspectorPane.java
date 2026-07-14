@@ -3,9 +3,10 @@ package dev.ghidraex.fx;
 import dev.ghidraex.engine.DisassemblyLine;
 import dev.ghidraex.engine.ProgramInfo;
 import dev.ghidraex.engine.Symbol;
-import javafx.collections.FXCollections;
+import dev.ghidraex.viewstate.ContextualReadSlot.Snapshot;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -14,16 +15,23 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
-final class InspectorPane extends VBox {
+final class InspectorPane extends VBox implements AutoCloseable {
     private final Label addressValue = valueLabel("—");
     private final Label instructionValue = valueLabel("—");
     private final Label flowValue = valueLabel("—");
     private final Label bytesValue = valueLabel("—");
     private final Label symbolName = new Label("entry");
     private final Label symbolMeta = new Label("FUNCTION · telemetryd");
-    private final ListView<String> xrefs = new ListView<>();
+    private final Label xrefState = new Label("● EMPTY");
+    private final Label xrefCount = new Label("Select an instruction");
+    private final Label xrefPlaceholder = new Label("Select an instruction");
+    private final ListView<AsyncEngineReads.ReferenceEntry> xrefs = new ListView<>();
+    private final AsyncEngineReads.ReadHandle<AsyncEngineReads.ReferenceQuery, AsyncEngineReads.ReferenceSet>
+            referenceReads;
+    private String displayedReferenceResultId = "";
 
-    InspectorPane(ProgramInfo program) {
+    InspectorPane(ProgramInfo program, AsyncEngineReads reads) {
+        referenceReads = java.util.Objects.requireNonNull(reads, "reads").openReferences(this::applyReferences);
         getStyleClass().add("inspector-pane");
         setMinWidth(210);
         setPrefWidth(310);
@@ -47,10 +55,7 @@ final class InspectorPane extends VBox {
             case RETURN -> "Function return";
         });
         bytesValue.setText(line.bytes());
-        xrefs.setItems(FXCollections.observableArrayList(
-                "FROM  0x%016x".formatted(line.address() - 0x28),
-                "FROM  0x%016x".formatted(line.address() - 0x0c),
-                "TO      0x%016x".formatted(line.address() + 0x34)));
+        referenceReads.submit(AsyncEngineReads.ReferenceQuery.at(line.address()));
     }
 
     void showSymbol(Symbol symbol) {
@@ -98,8 +103,62 @@ final class InspectorPane extends VBox {
 
     private Tab buildXrefsTab() {
         xrefs.getStyleClass().add("xref-list");
-        xrefs.setPlaceholder(new Label("Select an instruction"));
-        return new Tab("XREFS", xrefs);
+        xrefs.setCellFactory(ignored -> new ReferenceCell());
+        xrefs.setPlaceholder(xrefPlaceholder);
+        xrefState.getStyleClass().addAll("state-chip", "query-state");
+        xrefCount.getStyleClass().add("muted-label");
+        HBox status = new HBox(7, xrefCount, xrefState);
+        status.setAlignment(Pos.CENTER_RIGHT);
+        HBox.setHgrow(xrefCount, Priority.ALWAYS);
+        status.getStyleClass().add("xref-status");
+        VBox content = new VBox(status, xrefs);
+        content.getStyleClass().add("xref-pane");
+        VBox.setVgrow(xrefs, Priority.ALWAYS);
+        return new Tab("XREFS", content);
+    }
+
+    private void applyReferences(
+            Snapshot<AsyncEngineReads.ReferenceQuery, AsyncEngineReads.ReferenceSet> snapshot) {
+        ReadStatePresentation.apply(xrefState, xrefs, snapshot, "Cross references");
+        xrefPlaceholder.setText(switch (snapshot.freshness()) {
+            case LOADING -> "Loading references…";
+            case FAILED -> "Reference request failed";
+            case RESYNCING -> "Waiting for a validated program snapshot";
+            default -> "No references";
+        });
+        var displayed = snapshot.displayed();
+        if (displayed == null) {
+            if (!displayedReferenceResultId.isEmpty()) {
+                displayedReferenceResultId = "";
+                xrefs.getItems().clear();
+            }
+            xrefCount.setText(snapshot.pending() == null ? "Select an instruction" : "Loading references");
+            return;
+        }
+        int size = displayed.value().references().size();
+        xrefCount.setText(size + (size == 1 ? " reference" : " references"));
+        if (!displayed.resultId().equals(displayedReferenceResultId)) {
+            displayedReferenceResultId = displayed.resultId();
+            xrefs.getItems().setAll(displayed.value().references());
+        }
+    }
+
+    @Override
+    public void close() {
+        referenceReads.close();
+    }
+
+    private static final class ReferenceCell extends ListCell<AsyncEngineReads.ReferenceEntry> {
+        @Override
+        protected void updateItem(AsyncEngineReads.ReferenceEntry reference, boolean empty) {
+            super.updateItem(reference, empty);
+            if (empty || reference == null) {
+                setText(null);
+                return;
+            }
+            setText("%-4s  0x%016x  ·  %s".formatted(
+                    reference.direction(), reference.address(), reference.kind()));
+        }
     }
 
     private static void addRow(GridPane grid, int row, String key, Label value) {

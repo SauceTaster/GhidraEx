@@ -1,0 +1,57 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      workflow-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /prototypes/web-workbench
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      web-development:
+        dependency-type: development
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /prototypes/vscode-workbench
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      vscode-development:
+        dependency-type: development
+        patterns:
+          - "*"
+
+  - package-ecosystem: gradle
+    directory: /integration/view-state/java
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: gradle
+    directory: /prototypes/javafx-workbench
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: gradle
+    directory: /prototypes/intellij-workbench
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: gradle
+    directory: /prototypes/web-workbench/server
+    schedule:
+      interval: weekly
+      day: monday

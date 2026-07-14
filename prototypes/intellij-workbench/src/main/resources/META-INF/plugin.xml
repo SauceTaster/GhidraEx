@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>dev.ghidraex.intellij-workbench</id>
-    <name>GhidraEx IntelliJ Workbench Prototype</name>
+    <name>GhidraEx Workbench Prototype</name>
     <vendor>GhidraEx</vendor>
 
     <description><![CDATA[
@@ -26,6 +26,9 @@
         <toolWindow id="RE Inspector"
                     anchor="right"
                     factoryClass="dev.ghidraex.intellij.toolwindow.InspectorToolWindowFactory"/>
+        <toolWindow id="RE Lab"
+                    anchor="bottom"
+                    factoryClass="dev.ghidraex.intellij.toolwindow.LabToolWindowFactory"/>
 
         <notificationGroup id="GhidraEx Analysis"
                            displayType="BALLOON"
@@ -62,6 +65,77 @@
                     description="Navigate the listing editor to the selected symbol">
                 <abbreviation value="regoto"/>
             </action>
+
+            <separator/>
+
+            <group id="dev.ghidraex.intellij.debuggerActions"
+                   text="Debugger"
+                   description="Native debugger workflow prototype"
+                   popup="true"
+                   searchable="true">
+                <action id="dev.ghidraex.intellij.DebugStart"
+                        class="dev.ghidraex.intellij.action.StartDebuggerAction"
+                        text="Start Synthetic Debug Session"
+                        description="Start a clearly labeled synthetic debug session suspended at entry">
+                    <abbreviation value="redebug"/>
+                </action>
+                <action id="dev.ghidraex.intellij.DebugResume"
+                        class="dev.ghidraex.intellij.action.ResumeDebuggerAction"
+                        text="Resume"
+                        description="Resume to the next enabled synthetic breakpoint"/>
+                <action id="dev.ghidraex.intellij.DebugPause"
+                        class="dev.ghidraex.intellij.action.PauseDebuggerAction"
+                        text="Pause"
+                        description="Pause a running synthetic target"/>
+                <separator/>
+                <action id="dev.ghidraex.intellij.DebugStepInto"
+                        class="dev.ghidraex.intellij.action.StepIntoDebuggerAction"
+                        text="Step Into"
+                        description="Advance and add a synthetic stack frame"/>
+                <action id="dev.ghidraex.intellij.DebugStepOver"
+                        class="dev.ghidraex.intellij.action.StepOverDebuggerAction"
+                        text="Step Over"
+                        description="Advance while preserving the synthetic stack depth"/>
+                <action id="dev.ghidraex.intellij.DebugStepOut"
+                        class="dev.ghidraex.intellij.action.StepOutDebuggerAction"
+                        text="Step Out"
+                        description="Return from the current synthetic stack frame"/>
+                <separator/>
+                <action id="dev.ghidraex.intellij.DebugToggleBreakpoint"
+                        class="dev.ghidraex.intellij.action.ToggleBreakpointAction"
+                        text="Toggle Breakpoint at Selected Symbol"
+                        description="Add or remove a debugger breakpoint at the workbench selection"/>
+                <action id="dev.ghidraex.intellij.DebugStop"
+                        class="dev.ghidraex.intellij.action.StopDebuggerAction"
+                        text="Stop"
+                        description="Terminate the synthetic debug session"/>
+            </group>
+
+            <group id="dev.ghidraex.intellij.scriptingActions"
+                   text="Scripting"
+                   description="Native scripting and command-console workflows"
+                   popup="true"
+                   searchable="true">
+                <action id="dev.ghidraex.intellij.ShowScriptConsole"
+                        class="dev.ghidraex.intellij.action.ShowScriptConsoleAction"
+                        text="Open Scripts &amp; REPL"
+                        description="Open the native script catalog and contract command console">
+                    <abbreviation value="rerepl"/>
+                </action>
+            </group>
+
+            <group id="dev.ghidraex.intellij.backendActions"
+                   text="Backend &amp; Plugins"
+                   description="Inspect backend discovery and plugin integration boundaries"
+                   popup="true"
+                   searchable="true">
+                <action id="dev.ghidraex.intellij.RefreshBackend"
+                        class="dev.ghidraex.intellij.action.RefreshBackendAction"
+                        text="Refresh Ghidra Backend Discovery"
+                        description="Re-probe a configured Ghidra distribution without activating it">
+                    <abbreviation value="rebackend"/>
+                </action>
+            </group>
         </group>
     </actions>
 </idea-plugin>

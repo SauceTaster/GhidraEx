@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/core-events.schema.json",
+  "title": "GhidraEx protocol v1 core event data",
+  "description": "Validate an event name and its data payload after validating the event envelope.",
+  "type": "object",
+  "required": ["event", "data"],
+  "properties": {
+    "event": {"$ref": "common.schema.json#/$defs/eventName"},
+    "data": {"type": "object"}
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {"properties": {"event": {"const": "session.ready"}, "data": {"$ref": "#/$defs/sessionReadyData"}}},
+    {"properties": {"event": {"const": "analysis.progress"}, "data": {"$ref": "#/$defs/analysisProgressData"}}},
+    {"properties": {"event": {"const": "engine.warning"}, "data": {"$ref": "#/$defs/engineWarningData"}}},
+    {"properties": {"event": {"const": "session.closing"}, "data": {"$ref": "#/$defs/sessionClosingData"}}}
+  ],
+  "$defs": {
+    "sessionReadyData": {
+      "type": "object",
+      "required": ["sessionId", "protocol", "server", "ghidra", "context", "programSha256"],
+      "properties": {
+        "sessionId": {"$ref": "common.schema.json#/$defs/opaqueId"},
+        "protocol": {"$ref": "common.schema.json#/$defs/protocolRange"},
+        "server": {"$ref": "common.schema.json#/$defs/identity"},
+        "ghidra": {
+          "type": "object",
+          "required": ["version"],
+          "properties": {
+            "version": {"type": "string", "minLength": 1, "maxLength": 128}
+          },
+          "additionalProperties": false
+        },
+        "context": {"$ref": "common.schema.json#/$defs/programContext"},
+        "programSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "analysisProgressData": {
+      "type": "object",
+      "required": ["phase", "completed", "total"],
+      "properties": {
+        "phase": {"enum": ["import", "analysis", "finalizing"]},
+        "completed": {"type": "integer", "minimum": 0},
+        "total": {"type": "integer", "minimum": 0},
+        "message": {"type": "string", "minLength": 1, "maxLength": 512}
+      },
+      "additionalProperties": false
+    },
+    "engineWarningData": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 2048}
+      },
+      "additionalProperties": false
+    },
+    "sessionClosingData": {
+      "type": "object",
+      "required": ["reason"],
+      "properties": {
+        "reason": {"enum": ["requested", "parent-lost", "idle-timeout", "engine-exit", "protocol-error"]},
+        "message": {"type": "string", "minLength": 1, "maxLength": 512}
+      },
+      "additionalProperties": false
+    }
+  }
+}

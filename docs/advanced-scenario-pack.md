@@ -8,6 +8,23 @@ synchronization, cancellation, transactions, persistence, or agent safety.
 The companion [`advanced-scenarios.json`](advanced-scenarios.json) is a compact manifest that test
 runners and synthetic engines can consume.
 
+## Current prototype coverage
+
+The new advanced surfaces intentionally cover lifecycle slices, not the full acceptance pack:
+
+- JavaFX and web exercise the `TRACE-01` captured/past/emulator coordinate states and the
+  `AGENT-01` capability/approval presentation model.
+- IntelliJ exercises native debugger actions, `ConsoleView` scripting workflows, backend discovery,
+  and plugin lifecycle matrices.
+- VS Code exercises a native DAP lifecycle subset of `TRACE-01` plus a bounded pseudoterminal and
+  `.gxscript` UI subset of `AGENT-01`.
+- The real `analyzeHeadless` bridge covers a deterministic read-only part of `ASYNC-01`: import,
+  analysis, timeout handling, process cancellation, and bounded program facts.
+
+None of these slices claims live Trace/RMI, transactional program mutation, arbitrary PyGhidra or
+Java execution, decompiler freshness, or third-party Ghidra extension activation. Those remain the
+acceptance boundary for the persistent sidecar.
+
 ## Shared state model
 
 All four workbenches should make these states observable and testable:

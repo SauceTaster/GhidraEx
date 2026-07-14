@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import {
   PROGRAM_ID,
   TOTAL_ROWS,
-  SyntheticEngine,
   formatAddress,
   type ProgramSummary,
   type SymbolMatch,
 } from '../core/engine';
+import { NativeReadCancelledError, type NativeReadService } from '../core/readService';
+import { LatestNativeRead } from './asyncReads';
 
 export const NATIVE_VIEW_IDS = {
   project: 'ghidraex.project',
@@ -61,16 +62,32 @@ abstract class RefreshableTreeProvider<T> implements vscode.TreeDataProvider<T>,
 export type ProjectTreeNode =
   | { readonly id: 'workspace'; readonly kind: 'workspace'; readonly label: string }
   | { readonly id: 'program'; readonly kind: 'program'; readonly label: string; readonly summary: ProgramSummary; readonly row: number }
-  | { readonly id: string; readonly kind: 'section'; readonly label: string; readonly description: string; readonly row?: number };
+  | { readonly id: string; readonly kind: 'section'; readonly label: string; readonly description: string; readonly row?: number }
+  | { readonly id: 'read-state'; readonly kind: 'read-state'; readonly label: string; readonly state: 'loading' | 'partial' | 'stale' | 'error' };
 
 export class ProjectTreeProvider extends RefreshableTreeProvider<ProjectTreeNode> {
+  private readonly read = new LatestNativeRead();
+  private summary: ProgramSummary | undefined;
+  private freshness: 'loading' | 'current' | 'partial' | 'stale' | 'error' = 'loading';
+  private detail = 'Loading program metadata…';
   private activeRow = -1;
 
-  public constructor(private readonly summary: ProgramSummary) {
+  public constructor(private readonly reads: NativeReadService) {
     super();
+    void this.refreshFromTransport();
   }
 
   public getTreeItem(node: ProjectTreeNode): vscode.TreeItem {
+    if (node.kind === 'read-state') {
+      const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
+      item.id = 'ghidraex.project.read-state';
+      item.contextValue = `ghidraex.read.${node.state}`;
+      item.iconPath = new vscode.ThemeIcon(
+        node.state === 'error' ? 'error' : node.state === 'partial' ? 'warning' : node.state === 'stale' ? 'history' : 'sync',
+      );
+      item.tooltip = this.detail;
+      return item;
+    }
     const expandable = node.kind === 'workspace' || node.kind === 'program';
     const item = new vscode.TreeItem(
       node.label,
@@ -108,7 +125,22 @@ export class ProjectTreeProvider extends RefreshableTreeProvider<ProjectTreeNode
       return [{ id: 'workspace', kind: 'workspace', label: 'ORBIT FIRMWARE' }];
     }
     if (node.kind === 'workspace') {
-      return [{ id: 'program', kind: 'program', label: this.summary.name, summary: this.summary, row: 0 }];
+      const children: ProjectTreeNode[] = [];
+      if (this.freshness !== 'current') {
+        children.push({
+          id: 'read-state',
+          kind: 'read-state',
+          state: this.freshness,
+          label: this.freshness === 'error'
+            ? 'Program metadata unavailable'
+            : this.freshness === 'partial' ? 'Program metadata is partial'
+            : this.freshness === 'stale' ? 'Refreshing stale program metadata…' : 'Loading program metadata…',
+        });
+      }
+      if (this.summary !== undefined) {
+        children.push({ id: 'program', kind: 'program', label: this.summary.name, summary: this.summary, row: 0 });
+      }
+      return children;
     }
     if (node.kind === 'program') {
       return [
@@ -125,6 +157,34 @@ export class ProjectTreeProvider extends RefreshableTreeProvider<ProjectTreeNode
     this.activeRow = row;
     this.refresh();
   }
+
+  public async refreshFromTransport(): Promise<void> {
+    const request = this.read.begin();
+    this.freshness = this.summary === undefined ? 'loading' : 'stale';
+    this.detail = this.summary === undefined ? 'Loading program metadata…' : 'Refreshing cached program metadata…';
+    this.refresh();
+    try {
+      const result = await this.reads.program({ signal: request.signal, scope: 'project-tree' });
+      if (!this.read.accepts(request.id)) return;
+      this.summary = { ...result.value };
+      this.freshness = result.completeness === 'COMPLETE' ? 'current' : 'partial';
+      this.detail = result.warnings.length === 0
+        ? `${result.resultId} · ${result.completeness}`
+        : result.warnings.join(' · ');
+      this.refresh();
+    } catch (error) {
+      if (error instanceof NativeReadCancelledError || request.signal.aborted) return;
+      if (!this.read.accepts(request.id)) return;
+      this.freshness = 'error';
+      this.detail = error instanceof Error ? error.message : String(error);
+      this.refresh();
+    }
+  }
+
+  public override dispose(): void {
+    this.read.dispose();
+    super.dispose();
+  }
 }
 
 type SymbolGroupKind = SymbolMatch['kind'];
@@ -132,7 +192,8 @@ type SymbolGroupKind = SymbolMatch['kind'];
 export type SymbolsTreeNode =
   | { readonly id: string; readonly kind: 'group'; readonly symbolKind: SymbolGroupKind; readonly label: string; readonly count: number }
   | { readonly id: string; readonly kind: 'symbol'; readonly symbol: SymbolMatch }
-  | { readonly id: 'empty'; readonly kind: 'empty'; readonly label: string };
+  | { readonly id: 'empty'; readonly kind: 'empty'; readonly label: string }
+  | { readonly id: 'read-state'; readonly kind: 'read-state'; readonly label: string; readonly state: 'loading' | 'partial' | 'stale' | 'error'; readonly detail: string };
 
 const SYMBOL_GROUPS: readonly { readonly kind: SymbolGroupKind; readonly label: string; readonly icon: string }[] = [
   { kind: 'Function', label: 'Functions', icon: 'symbol-method' },
@@ -141,13 +202,16 @@ const SYMBOL_GROUPS: readonly { readonly kind: SymbolGroupKind; readonly label: 
 ];
 
 export class SymbolsTreeProvider extends RefreshableTreeProvider<SymbolsTreeNode> {
+  private readonly read = new LatestNativeRead();
   private query = '';
-  private matches: readonly SymbolMatch[];
+  private matches: readonly SymbolMatch[] = [];
+  private freshness: 'loading' | 'current' | 'partial' | 'stale' | 'error' = 'loading';
+  private detail = 'Loading symbols…';
   private activeRow = -1;
 
-  public constructor(private readonly engine: SyntheticEngine) {
+  public constructor(private readonly reads: NativeReadService) {
     super();
-    this.matches = engine.searchSymbols('', 50);
+    void this.refreshFromTransport();
   }
 
   public get filter(): string {
@@ -155,6 +219,16 @@ export class SymbolsTreeProvider extends RefreshableTreeProvider<SymbolsTreeNode
   }
 
   public getTreeItem(node: SymbolsTreeNode): vscode.TreeItem {
+    if (node.kind === 'read-state') {
+      const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
+      item.id = 'ghidraex.symbols.read-state';
+      item.contextValue = `ghidraex.read.${node.state}`;
+      item.iconPath = new vscode.ThemeIcon(
+        node.state === 'error' ? 'error' : node.state === 'partial' ? 'warning' : node.state === 'stale' ? 'history' : 'sync',
+      );
+      item.tooltip = node.detail;
+      return item;
+    }
     if (node.kind === 'empty') {
       const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
       item.id = 'ghidraex.symbols.empty';
@@ -192,10 +266,26 @@ export class SymbolsTreeProvider extends RefreshableTreeProvider<SymbolsTreeNode
 
   public getChildren(node?: SymbolsTreeNode): SymbolsTreeNode[] {
     if (node === undefined) {
-      if (this.matches.length === 0) {
-        return [{ id: 'empty', kind: 'empty', label: this.query ? `No symbols match “${this.query}”` : 'No symbols available' }];
+      const roots: SymbolsTreeNode[] = [];
+      if (this.freshness !== 'current') {
+        roots.push({
+          id: 'read-state',
+          kind: 'read-state',
+          state: this.freshness,
+          label: this.freshness === 'error'
+            ? 'Symbol read failed; cached results retained'
+            : this.freshness === 'partial' ? 'Symbol results are partial'
+            : this.freshness === 'stale' ? 'Refreshing stale symbols…' : 'Loading symbols…',
+          detail: this.detail,
+        });
       }
-      return SYMBOL_GROUPS.flatMap(group => {
+      if (this.matches.length === 0) {
+        if (this.freshness === 'current') {
+          roots.push({ id: 'empty', kind: 'empty', label: this.query ? `No symbols match “${this.query}”` : 'No symbols available' });
+        }
+        return roots;
+      }
+      roots.push(...SYMBOL_GROUPS.flatMap(group => {
         const count = this.matches.filter(match => match.kind === group.kind).length;
         return count === 0 ? [] : [{
           id: `ghidraex.symbols.group.${group.kind.toLowerCase()}`,
@@ -204,7 +294,8 @@ export class SymbolsTreeProvider extends RefreshableTreeProvider<SymbolsTreeNode
           label: group.label,
           count,
         }];
-      });
+      }));
+      return roots;
     }
     if (node.kind !== 'group') return [];
     return this.matches
@@ -220,14 +311,45 @@ export class SymbolsTreeProvider extends RefreshableTreeProvider<SymbolsTreeNode
     const normalized = query.trim();
     if (normalized === this.query) return;
     this.query = normalized;
-    this.matches = this.engine.searchSymbols(normalized, 50);
-    this.refresh();
+    void this.refreshFromTransport();
   }
 
   public setActiveRow(row: number): void {
     if (this.activeRow === row) return;
     this.activeRow = row;
     this.refresh();
+  }
+
+  public async refreshFromTransport(): Promise<void> {
+    const requestedQuery = this.query;
+    const request = this.read.begin();
+    this.freshness = this.matches.length === 0 ? 'loading' : 'stale';
+    this.detail = requestedQuery.length === 0 ? 'Loading bounded symbol index…' : `Filtering symbols for “${requestedQuery}”…`;
+    this.refresh();
+    try {
+      const result = await this.reads.symbols(this.reads.context, requestedQuery, 50, {
+        signal: request.signal,
+        scope: 'symbols-tree',
+      });
+      if (!this.read.accepts(request.id) || requestedQuery !== this.query) return;
+      this.matches = result.value.map(symbol => ({ ...symbol }));
+      this.freshness = result.completeness === 'COMPLETE' ? 'current' : 'partial';
+      this.detail = result.warnings.length === 0
+        ? `${result.resultId} · ${result.completeness}`
+        : result.warnings.join(' · ');
+      this.refresh();
+    } catch (error) {
+      if (error instanceof NativeReadCancelledError || request.signal.aborted) return;
+      if (!this.read.accepts(request.id)) return;
+      this.freshness = 'error';
+      this.detail = error instanceof Error ? error.message : String(error);
+      this.refresh();
+    }
+  }
+
+  public override dispose(): void {
+    this.read.dispose();
+    super.dispose();
   }
 }
 
@@ -362,34 +484,26 @@ export interface NativeEvidence {
 
 export type EvidenceTreeNode =
   | { readonly id: string; readonly kind: 'evidence'; readonly evidence: NativeEvidence }
-  | { readonly id: string; readonly kind: 'detail'; readonly label: string; readonly description?: string; readonly row?: number };
-
-const DEFAULT_EVIDENCE: readonly NativeEvidence[] = [
-  {
-    id: 'length-guard',
-    kind: 'finding',
-    title: 'Length guard dominates decode',
-    detail: 'payloadLength is bounded before decode_payload is called.',
-    confidence: 0.92,
-    row: 452,
-    tags: ['control-flow', 'bounds-check'],
-  },
-  {
-    id: 'signedness',
-    kind: 'hypothesis',
-    title: 'Possible signedness issue',
-    detail: 'Hypothesis only; the evidence is insufficient for a mutation proposal.',
-    confidence: 0.68,
-    row: 449,
-    tags: ['data-flow', 'review-needed'],
-  },
-];
+  | { readonly id: string; readonly kind: 'detail'; readonly label: string; readonly description?: string; readonly row?: number }
+  | { readonly id: 'read-state'; readonly kind: 'read-state'; readonly label: string; readonly state: 'loading' | 'partial' | 'stale' | 'error'; readonly detail: string };
 
 export class EvidenceTreeProvider extends RefreshableTreeProvider<EvidenceTreeNode> {
-  private items: readonly NativeEvidence[] = DEFAULT_EVIDENCE;
+  private items: readonly NativeEvidence[] = [];
+  private freshness: 'loading' | 'current' | 'partial' | 'stale' | 'error' = 'loading';
+  private detail = 'Loading evidence for the active location…';
   private activeRow = -1;
 
   public getTreeItem(node: EvidenceTreeNode): vscode.TreeItem {
+    if (node.kind === 'read-state') {
+      const item = new vscode.TreeItem(node.label, vscode.TreeItemCollapsibleState.None);
+      item.id = 'ghidraex.evidence.read-state';
+      item.contextValue = `ghidraex.read.${node.state}`;
+      item.iconPath = new vscode.ThemeIcon(
+        node.state === 'error' ? 'error' : node.state === 'partial' ? 'warning' : node.state === 'stale' ? 'history' : 'sync',
+      );
+      item.tooltip = node.detail;
+      return item;
+    }
     if (node.kind === 'evidence') {
       const { evidence } = node;
       const item = new vscode.TreeItem(evidence.title, vscode.TreeItemCollapsibleState.Collapsed);
@@ -412,7 +526,25 @@ export class EvidenceTreeProvider extends RefreshableTreeProvider<EvidenceTreeNo
 
   public getChildren(node?: EvidenceTreeNode): EvidenceTreeNode[] {
     if (node === undefined) {
-      return this.items.map(evidence => ({ id: `ghidraex.evidence.${evidence.id}`, kind: 'evidence', evidence }));
+      const roots: EvidenceTreeNode[] = [];
+      if (this.freshness !== 'current') {
+        roots.push({
+          id: 'read-state',
+          kind: 'read-state',
+          state: this.freshness,
+          label: this.freshness === 'error'
+            ? 'Evidence read failed; cached results retained'
+            : this.freshness === 'partial' ? 'Evidence results are partial'
+            : this.freshness === 'stale' ? 'Refreshing stale evidence…' : 'Loading evidence…',
+          detail: this.detail,
+        });
+      }
+      roots.push(...this.items.map(evidence => ({
+        id: `ghidraex.evidence.${evidence.id}`,
+        kind: 'evidence' as const,
+        evidence,
+      })));
+      return roots;
     }
     if (node.kind !== 'evidence') return [];
     const children: EvidenceTreeNode[] = [];
@@ -432,8 +564,22 @@ export class EvidenceTreeProvider extends RefreshableTreeProvider<EvidenceTreeNo
     return children;
   }
 
-  public setEvidence(evidence: readonly NativeEvidence[]): void {
+  public setEvidence(evidence: readonly NativeEvidence[], partialDetail?: string): void {
     this.items = [...evidence];
+    this.freshness = partialDetail === undefined ? 'current' : 'partial';
+    this.detail = partialDetail ?? `${evidence.length} context-qualified evidence records`;
+    this.refresh();
+  }
+
+  public setLoading(detail = 'Loading evidence for the active location…'): void {
+    this.freshness = this.items.length === 0 ? 'loading' : 'stale';
+    this.detail = detail;
+    this.refresh();
+  }
+
+  public setError(error: unknown): void {
+    this.freshness = 'error';
+    this.detail = error instanceof Error ? error.message : String(error);
     this.refresh();
   }
 
@@ -460,10 +606,10 @@ export class NativeTreeViews implements vscode.Disposable {
 
   public constructor(
     private readonly callbacks: NativeTreeCallbacks,
-    engine = new SyntheticEngine(),
+    reads: NativeReadService,
   ) {
-    this.project = new ProjectTreeProvider(engine.openProgram());
-    this.symbols = new SymbolsTreeProvider(engine);
+    this.project = new ProjectTreeProvider(reads);
+    this.symbols = new SymbolsTreeProvider(reads);
     this.analysis = new AnalysisTreeProvider();
     this.evidence = new EvidenceTreeProvider();
     this.views = {
@@ -507,7 +653,7 @@ export class NativeTreeViews implements vscode.Disposable {
       vscode.commands.registerCommand(NATIVE_COMMAND_IDS.navigate, (argument: unknown) => this.navigateCommand(argument)),
       vscode.commands.registerCommand(NATIVE_COMMAND_IDS.refresh, () => this.run(async () => {
         await this.callbacks.onRefresh?.();
-        this.refreshAll();
+        await this.refreshAll();
       })),
       vscode.commands.registerCommand(NATIVE_COMMAND_IDS.filterSymbols, () => this.run(() => this.promptForSymbolFilter())),
       vscode.commands.registerCommand(NATIVE_COMMAND_IDS.clearSymbolFilter, () => this.setSymbolFilter('')),
@@ -535,15 +681,25 @@ export class NativeTreeViews implements vscode.Disposable {
     this.views.analysis.description = `${this.analysis.state.percent}% · ${this.analysis.state.status}`;
   }
 
-  public setEvidence(evidence: readonly NativeEvidence[]): void {
-    this.evidence.setEvidence(evidence);
+  public setEvidence(evidence: readonly NativeEvidence[], partialDetail?: string): void {
+    this.evidence.setEvidence(evidence, partialDetail);
   }
 
-  public refreshAll(): void {
-    this.project.refresh();
-    this.symbols.refresh();
+  public setEvidenceLoading(detail?: string): void {
+    this.evidence.setLoading(detail);
+  }
+
+  public setEvidenceError(error: unknown): void {
+    this.evidence.setError(error);
+  }
+
+  public async refreshAll(): Promise<void> {
     this.analysis.refresh();
     this.evidence.refresh();
+    await Promise.all([
+      this.project.refreshFromTransport(),
+      this.symbols.refreshFromTransport(),
+    ]);
   }
 
   private navigate(request: NativeNavigationRequest): void {
@@ -596,9 +752,9 @@ export class NativeTreeViews implements vscode.Disposable {
 export function registerNativeTreeViews(
   context: vscode.ExtensionContext,
   callbacks: NativeTreeCallbacks,
-  engine?: SyntheticEngine,
+  reads: NativeReadService,
 ): NativeTreeViews {
-  const nativeViews = new NativeTreeViews(callbacks, engine);
+  const nativeViews = new NativeTreeViews(callbacks, reads);
   context.subscriptions.push(nativeViews);
   return nativeViews;
 }

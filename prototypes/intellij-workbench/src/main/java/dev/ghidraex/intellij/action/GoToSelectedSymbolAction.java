@@ -23,12 +23,16 @@ public final class GoToSelectedSymbolAction extends DumbAwareAction {
 
     public static void navigate(com.intellij.openapi.project.Project project) {
         var session = WorkbenchSession.getInstance(project);
-        var symbol = session.selectedSymbol();
+        navigate(project, session.selectedSymbol().address());
+    }
+
+    public static void navigate(com.intellij.openapi.project.Project project, long address) {
+        var session = WorkbenchSession.getInstance(project);
         var editors = FileEditorManager.getInstance(project);
         editors.openFile(session.listingFile(), true);
         for (var editor : editors.getAllEditors(session.listingFile())) {
             if (editor instanceof VirtualizedListingEditor listingEditor) {
-                listingEditor.revealAddress(symbol.address());
+                listingEditor.revealAddress(address);
             }
         }
     }
