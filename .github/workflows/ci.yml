@@ -14,9 +14,57 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  core:
+    name: Core contracts and engine
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Verify boundaries, release contract, protocol, supervisor, and gateway
+        run: |
+          python3 scripts/check-ui-read-boundaries.py
+          python3 -W error::ResourceWarning -m unittest discover -s scripts/tests -v
+          python3 -W error::ResourceWarning -m unittest discover -s integration/protocol/tests -v
+          python3 -W error::ResourceWarning -m unittest discover -s integration/ghidra/tests -v
+          python3 -W error::ResourceWarning -m unittest discover -s integration/gateway/tests -v
+
+  workbench:
+    name: Workbench / JavaFX
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle caching
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Verify shared state spine and JavaFX product
+        run: |
+          ./prototypes/javafx-workbench/gradlew -p integration/view-state/java clean test
+          ./prototypes/javafx-workbench/gradlew -p prototypes/javafx-workbench clean build
+
+  web:
+    name: Web workbench
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -34,17 +82,64 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: |
-            prototypes/web-workbench/package-lock.json
-            prototypes/vscode-workbench/package-lock.json
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.12"
+          cache-dependency-path: prototypes/web-workbench/package-lock.json
 
       - name: Set up Gradle caching
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
-      - name: Verify all prototypes
-        run: ./scripts/verify-all.sh
+      - name: Verify web frontend and JVM service
+        run: |
+          npm --prefix prototypes/web-workbench ci
+          npm --prefix prototypes/web-workbench test
+          npm --prefix prototypes/web-workbench run build
+          ./prototypes/web-workbench/server/gradlew -p prototypes/web-workbench/server clean test
+
+  jetbrains:
+    name: JetBrains plugin
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle caching
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+
+      - name: Verify and package JetBrains plugin
+        run: >-
+          ./prototypes/intellij-workbench/gradlew
+          -p prototypes/intellij-workbench
+          clean test buildPlugin verifyPluginProjectConfiguration verifyPluginStructure
+          --no-configuration-cache
+
+  vscode:
+    name: VS Code / Code OSS extension
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: prototypes/vscode-workbench/package-lock.json
+
+      - name: Verify desktop, browser host, and VSIX
+        run: |
+          npm --prefix prototypes/vscode-workbench ci
+          npm --prefix prototypes/vscode-workbench test
+          npm --prefix prototypes/vscode-workbench run test:web
+          npm --prefix prototypes/vscode-workbench run package
