@@ -137,9 +137,15 @@ jobs:
           cache: npm
           cache-dependency-path: prototypes/vscode-workbench/package-lock.json
 
-      - name: Verify desktop, browser host, and VSIX
-        run: |
-          npm --prefix prototypes/vscode-workbench ci
-          npm --prefix prototypes/vscode-workbench test
-          npm --prefix prototypes/vscode-workbench run test:web
-          npm --prefix prototypes/vscode-workbench run package
+      - name: Install extension dependencies
+        run: npm --prefix prototypes/vscode-workbench ci
+
+      - name: Verify extension unit tests
+        run: npm --prefix prototypes/vscode-workbench test
+
+      - name: Verify browser extension host
+        timeout-minutes: 10
+        run: npm --prefix prototypes/vscode-workbench run test:web
+
+      - name: Package VSIX
+        run: npm --prefix prototypes/vscode-workbench run package

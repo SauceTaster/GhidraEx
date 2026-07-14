@@ -615,7 +615,7 @@
     "package": "npm run check && node esbuild.mjs --production && vsce package --out dist/ghidraex-vscode-workbench.vsix",
     "open:desktop": "npm run build && node scripts/launch-desktop.mjs",
     "open:web": "npm run build && vscode-test-web --browserType=chromium --port=31048 --extensionDevelopmentPath=. test-fixtures",
-    "test:web": "npm run build && vscode-test-web --browserType=chromium --port=31047 --extensionDevelopmentPath=. --extensionTestsPath=dist/web-test/index.js test-fixtures"
+    "test:web": "npm run build && vscode-test-web --browser=chromium --quality=insiders --commit=72f41c0fcc3eb4e8d28bbeca7321625b5ac0d302 --headless --verbose --printServerLog --port=31047 --extensionDevelopmentPath=. --extensionTestsPath=dist/web-test/index.js test-fixtures"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
