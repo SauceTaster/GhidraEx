@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "dev.ghidraex"
-version = "0.1.0"
+version = providers.gradleProperty("releaseVersion").orElse("0.1.0-SNAPSHOT").get()
 
 repositories {
     mavenCentral()
@@ -17,6 +17,8 @@ repositories {
 }
 
 dependencies {
+    implementation("dev.ghidraex:ghidraex-view-state:${project.version}")
+
     intellijPlatform {
         intellijIdeaCommunity("2025.1.5")
     }
@@ -38,6 +40,12 @@ java {
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(21)
     options.encoding = "UTF-8"
+}
+
+tasks.processResources {
+    from(rootProject.file("../../LICENSE")) {
+        rename { "LICENSE.txt" }
+    }
 }
 
 tasks.test {
@@ -62,12 +70,11 @@ tasks.named<RunIdeTask>("runIde") {
 
 intellijPlatform {
     pluginConfiguration {
-        name = "GhidraEx IntelliJ Workbench Prototype"
+        name = "GhidraEx Workbench Prototype"
         version = project.version.toString()
 
         ideaVersion {
             sinceBuild = "251"
-            untilBuild = "253.*"
         }
     }
 }

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/request.schema.json",
+  "title": "GhidraEx protocol v1 request envelope",
+  "type": "object",
+  "required": ["kind", "version", "id", "method", "params"],
+  "properties": {
+    "kind": {"const": "request"},
+    "version": {"const": 1},
+    "id": {"$ref": "common.schema.json#/$defs/requestId"},
+    "method": {"$ref": "common.schema.json#/$defs/methodName"},
+    "context": {"$ref": "common.schema.json#/$defs/programContext"},
+    "timeoutMs": {"type": "integer", "minimum": 100, "maximum": 30000},
+    "params": {"type": "object"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,26 @@
+GhidraEx Workbench third-party notices
+=========================================
+
+OpenJFX 26
+----------
+
+The GhidraEx Workbench portable ZIP redistributes the unmodified OpenJFX 26
+javafx-base, javafx-graphics, and javafx-controls binary modules for the
+platform named in the artifact filename.
+
+OpenJFX is licensed under GNU General Public License version 2 with the
+Classpath Exception. The accompanying OpenJFX LICENSE,
+ADDITIONAL_LICENSE_INFO, and ASSEMBLY_EXCEPTION files are copied from the
+OpenJFX 26 GA source tag.
+
+Corresponding source is available from:
+https://github.com/openjdk/jfx/tree/26-ga
+
+Maven coordinates:
+- org.openjfx:javafx-base:26
+- org.openjfx:javafx-graphics:26
+- org.openjfx:javafx-controls:26
+
+Ghidra is not included in any GhidraEx release artifact. Users who connect a
+future real adapter must install a supported official Ghidra distribution
+separately and accept its licensing terms.

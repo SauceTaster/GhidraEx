@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/core-methods.schema.json",
+  "title": "GhidraEx protocol v1 core method payload",
+  "description": "Validate params as direction=request and successful result as direction=response.",
+  "type": "object",
+  "required": ["method", "direction", "payload"],
+  "properties": {
+    "method": {"$ref": "common.schema.json#/$defs/methodName"},
+    "direction": {"enum": ["request", "response"]},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {"properties": {"method": {"const": "session.hello"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/sessionHelloParams"}}},
+    {"properties": {"method": {"const": "session.hello"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/sessionHelloResult"}}},
+    {"properties": {"method": {"const": "session.ping"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/sessionPingParams"}}},
+    {"properties": {"method": {"const": "session.ping"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/sessionPingResult"}}},
+    {"properties": {"method": {"const": "session.close"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/sessionCloseParams"}}},
+    {"properties": {"method": {"const": "session.close"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/sessionCloseResult"}}},
+    {"properties": {"method": {"const": "request.cancel"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/requestCancelParams"}}},
+    {"properties": {"method": {"const": "request.cancel"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/requestCancelResult"}}},
+    {"properties": {"method": {"const": "program.summary"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/programSummaryParams"}}},
+    {"properties": {"method": {"const": "program.summary"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/programSummaryResult"}}},
+    {"properties": {"method": {"const": "listing.window"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/listingWindowParams"}}},
+    {"properties": {"method": {"const": "listing.window"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/listingWindowResult"}}},
+    {"properties": {"method": {"const": "symbols.search"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/symbolsSearchParams"}}},
+    {"properties": {"method": {"const": "symbols.search"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/symbolsSearchResult"}}},
+    {"properties": {"method": {"const": "decompile.function"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/decompileFunctionParams"}}},
+    {"properties": {"method": {"const": "decompile.function"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/decompileFunctionResult"}}},
+    {"properties": {"method": {"const": "references.list"}, "direction": {"const": "request"}, "payload": {"$ref": "#/$defs/referencesListParams"}}},
+    {"properties": {"method": {"const": "references.list"}, "direction": {"const": "response"}, "payload": {"$ref": "#/$defs/referencesListResult"}}}
+  ],
+  "$defs": {
+    "sessionHelloParams": {
+      "type": "object",
+      "required": ["client", "protocol"],
+      "properties": {
+        "client": {"$ref": "common.schema.json#/$defs/identity"},
+        "protocol": {"$ref": "common.schema.json#/$defs/protocolRange"},
+        "requestedCapabilities": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"$ref": "common.schema.json#/$defs/methodName"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "sessionHelloResult": {
+      "type": "object",
+      "required": ["selectedVersion", "sessionId", "server", "ghidra", "capabilities"],
+      "properties": {
+        "selectedVersion": {"const": 1},
+        "sessionId": {"$ref": "common.schema.json#/$defs/opaqueId"},
+        "server": {"$ref": "common.schema.json#/$defs/identity"},
+        "ghidra": {
+          "type": "object",
+          "required": ["version"],
+          "properties": {
+            "version": {"type": "string", "minLength": 1, "maxLength": 128}
+          },
+          "additionalProperties": false
+        },
+        "capabilities": {"$ref": "common.schema.json#/$defs/capabilities"}
+      },
+      "additionalProperties": false
+    },
+    "sessionPingParams": {
+      "type": "object",
+      "properties": {
+        "nonce": {"type": "string", "minLength": 1, "maxLength": 128}
+      },
+      "additionalProperties": false
+    },
+    "sessionPingResult": {
+      "type": "object",
+      "required": ["monotonicTimeMs", "state"],
+      "properties": {
+        "nonce": {"type": "string", "minLength": 1, "maxLength": 128},
+        "monotonicTimeMs": {"type": "integer", "minimum": 0},
+        "state": {"enum": ["starting", "ready", "busy", "closing"]}
+      },
+      "additionalProperties": false
+    },
+    "sessionCloseParams": {
+      "type": "object",
+      "properties": {
+        "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+      },
+      "additionalProperties": false
+    },
+    "sessionCloseResult": {
+      "type": "object",
+      "required": ["accepted"],
+      "properties": {
+        "accepted": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "requestCancelParams": {
+      "type": "object",
+      "required": ["targetId"],
+      "properties": {
+        "targetId": {"$ref": "common.schema.json#/$defs/requestId"}
+      },
+      "additionalProperties": false
+    },
+    "requestCancelResult": {
+      "type": "object",
+      "required": ["accepted", "state"],
+      "properties": {
+        "accepted": {"type": "boolean"},
+        "state": {"enum": ["requested", "already-complete", "not-cancellable"]}
+      },
+      "additionalProperties": false
+    },
+    "programSummaryParams": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "programSummaryResult": {
+      "type": "object",
+      "required": [
+        "name",
+        "executableFormat",
+        "languageId",
+        "compilerSpecId",
+        "imageBase",
+        "minAddress",
+        "maxAddress",
+        "sha256",
+        "analysis",
+        "memoryBlockCount",
+        "instructionCount",
+        "functionCount",
+        "symbolCount"
+      ],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 512},
+        "executableFormat": {"type": "string", "minLength": 1, "maxLength": 256},
+        "languageId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "compilerSpecId": {"type": "string", "minLength": 1, "maxLength": 256},
+        "imageBase": {"$ref": "common.schema.json#/$defs/address"},
+        "minAddress": {"$ref": "common.schema.json#/$defs/address"},
+        "maxAddress": {"$ref": "common.schema.json#/$defs/address"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "analysis": {
+          "type": "object",
+          "required": ["complete", "timedOut"],
+          "properties": {
+            "complete": {"type": "boolean"},
+            "timedOut": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        "memoryBlockCount": {"type": "integer", "minimum": 0},
+        "instructionCount": {"type": "integer", "minimum": 0},
+        "functionCount": {"type": "integer", "minimum": 0},
+        "symbolCount": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "listingWindowParams": {
+      "type": "object",
+      "properties": {
+        "start": {"$ref": "common.schema.json#/$defs/address"},
+        "cursor": {"$ref": "common.schema.json#/$defs/cursor"},
+        "direction": {"enum": ["forward", "backward"]},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "includeBytes": {"type": "boolean"}
+      },
+      "oneOf": [
+        {"required": ["start"], "properties": {"start": true, "cursor": false}},
+        {"required": ["cursor"], "properties": {"start": false, "cursor": true}}
+      ],
+      "additionalProperties": false
+    },
+    "listingItem": {
+      "type": "object",
+      "required": ["address", "length", "kind"],
+      "properties": {
+        "address": {"$ref": "common.schema.json#/$defs/address"},
+        "length": {"type": "integer", "minimum": 1, "maximum": 1048576},
+        "kind": {"enum": ["instruction", "data", "undefined"]},
+        "label": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "mnemonic": {"type": "string", "minLength": 1, "maxLength": 256},
+        "operands": {"type": "string", "maxLength": 4096},
+        "bytes": {"type": "string", "maxLength": 2097152, "pattern": "^([0-9a-f]{2})*$"},
+        "flowType": {"type": "string", "minLength": 1, "maxLength": 128},
+        "function": {"type": "string", "minLength": 1, "maxLength": 1024}
+      },
+      "additionalProperties": false
+    },
+    "listingWindowResult": {
+      "type": "object",
+      "required": ["items", "truncated"],
+      "properties": {
+        "items": {"type": "array", "maxItems": 1000, "items": {"$ref": "#/$defs/listingItem"}},
+        "nextCursor": {"$ref": "common.schema.json#/$defs/cursor"},
+        "previousCursor": {"$ref": "common.schema.json#/$defs/cursor"},
+        "truncated": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "symbolsSearchParams": {
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": {"type": "string", "maxLength": 256},
+        "kinds": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {"enum": ["label", "function", "namespace", "class", "parameter", "local", "external", "library", "unknown"]}
+        },
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+        "cursor": {"$ref": "common.schema.json#/$defs/cursor"}
+      },
+      "additionalProperties": false
+    },
+    "symbolItem": {
+      "type": "object",
+      "required": ["name", "address", "kind", "primary"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "address": {"$ref": "common.schema.json#/$defs/address"},
+        "kind": {"enum": ["label", "function", "namespace", "class", "parameter", "local", "external", "library", "unknown"]},
+        "namespace": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "source": {"type": "string", "minLength": 1, "maxLength": 128},
+        "primary": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "symbolsSearchResult": {
+      "type": "object",
+      "required": ["items", "truncated"],
+      "properties": {
+        "items": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/symbolItem"}},
+        "nextCursor": {"$ref": "common.schema.json#/$defs/cursor"},
+        "truncated": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "decompileFunctionParams": {
+      "type": "object",
+      "required": ["address"],
+      "properties": {
+        "address": {"$ref": "common.schema.json#/$defs/address"},
+        "maxChars": {"type": "integer", "minimum": 1024, "maximum": 500000}
+      },
+      "additionalProperties": false
+    },
+    "decompileFunctionResult": {
+      "type": "object",
+      "required": ["function", "language", "text", "truncated", "warnings"],
+      "properties": {
+        "function": {
+          "type": "object",
+          "required": ["name", "entryPoint", "signature"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "entryPoint": {"$ref": "common.schema.json#/$defs/address"},
+            "signature": {"type": "string", "minLength": 1, "maxLength": 16384}
+          },
+          "additionalProperties": false
+        },
+        "language": {"const": "c"},
+        "text": {"type": "string", "maxLength": 500000},
+        "truncated": {"type": "boolean"},
+        "warnings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"type": "string", "minLength": 1, "maxLength": 2048}
+        }
+      },
+      "additionalProperties": false
+    },
+    "referencesListParams": {
+      "type": "object",
+      "required": ["address"],
+      "properties": {
+        "address": {"$ref": "common.schema.json#/$defs/address"},
+        "direction": {"enum": ["to", "from", "both"]},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 2000},
+        "cursor": {"$ref": "common.schema.json#/$defs/cursor"}
+      },
+      "additionalProperties": false
+    },
+    "referenceItem": {
+      "type": "object",
+      "required": ["fromAddress", "toAddress", "type", "primary", "external"],
+      "properties": {
+        "fromAddress": {"$ref": "common.schema.json#/$defs/address"},
+        "toAddress": {"$ref": "common.schema.json#/$defs/address"},
+        "type": {"type": "string", "minLength": 1, "maxLength": 128},
+        "operandIndex": {"type": "integer", "minimum": -1, "maximum": 65535},
+        "primary": {"type": "boolean"},
+        "external": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "referencesListResult": {
+      "type": "object",
+      "required": ["items", "truncated"],
+      "properties": {
+        "items": {"type": "array", "maxItems": 2000, "items": {"$ref": "#/$defs/referenceItem"}},
+        "nextCursor": {"$ref": "common.schema.json#/$defs/cursor"},
+        "truncated": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

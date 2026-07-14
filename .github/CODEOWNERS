@@ -1,0 +1,9 @@
+# Release and trust-boundary changes always require the repository owner.
+/.github/ @SauceTaster
+/release/ @SauceTaster
+/scripts/release.py @SauceTaster
+/integration/protocol/ @SauceTaster
+/integration/gateway/ @SauceTaster
+/integration/ghidra/ @SauceTaster
+
+* @SauceTaster

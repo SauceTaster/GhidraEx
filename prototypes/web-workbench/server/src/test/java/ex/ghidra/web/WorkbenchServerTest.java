@@ -18,7 +18,8 @@ class WorkbenchServerTest {
 
     @Test
     void servesVersionedSnapshotOnLoopback() throws Exception {
-        try (SyntheticEngine engine = new SyntheticEngine(); WorkbenchServer server = new WorkbenchServer(0, engine)) {
+        try (SyntheticEngine engine = new SyntheticEngine(java.util.Map.of());
+             WorkbenchServer server = new WorkbenchServer(0, engine)) {
             server.start();
             HttpRequest request = HttpRequest.newBuilder(endpoint(server, "/api/v1/snapshot"))
                     .header("Origin", WorkbenchServer.ALLOWED_ORIGIN)
@@ -31,6 +32,8 @@ class WorkbenchServerTest {
                     response.headers().firstValue("Access-Control-Allow-Origin").orElseThrow());
             assertTrue(response.body().contains("\"apiVersion\":1"));
             assertTrue(response.body().contains("\"quartz-agent\""));
+            assertTrue(response.body().contains("\"backend\""));
+            assertTrue(response.body().contains("\"synthetic-fixture\""));
             assertTrue(response.body().contains("\"totalInstructions\":100000"));
             String farAddress = "0x%08x".formatted(SyntheticEngine.addressForOrdinal(90_000));
             assertFalse(response.body().contains(farAddress), "snapshot must remain viewport-sized");

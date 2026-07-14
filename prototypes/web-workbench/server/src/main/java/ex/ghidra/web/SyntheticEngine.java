@@ -1,9 +1,13 @@
 package ex.ghidra.web;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -18,6 +22,9 @@ import java.util.function.Consumer;
 final class SyntheticEngine implements AutoCloseable {
     record ProjectState(String name, String binary, String format, String architecture,
                         String imageBase, String sha256) {}
+
+    record BackendState(String mode, String health, String version, String launcher,
+                        List<String> capabilities) {}
 
     record AnalysisState(String status, int progress, String phase, long elapsedMs,
                          int functionsDiscovered) {}
@@ -41,7 +48,8 @@ final class SyntheticEngine implements AutoCloseable {
                           String segment, String offset, int xrefsIn, int xrefsOut,
                           int stackDelta, String prototypeSource) {}
 
-    record WorkbenchSnapshot(int apiVersion, ProjectState project, AnalysisState analysis,
+    record WorkbenchSnapshot(int apiVersion, ProjectState project, BackendState backend,
+                             AnalysisState analysis,
                              List<SymbolRecord> symbols, ListingExtent listingInfo,
                              List<ListingRow> listing,
                              String decompiler, InspectorState inspector) {}
@@ -61,6 +69,7 @@ final class SyntheticEngine implements AutoCloseable {
             "0x00400000",
             "1fb99e832e462ed957ba537a22d1d6303d7b418f7f71340447e810b28e5afc61"
     );
+    private final BackendState backend;
     private final List<SymbolRecord> symbols = createSymbols();
     private final CopyOnWriteArrayList<Consumer<AnalysisState>> listeners = new CopyOnWriteArrayList<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
@@ -73,6 +82,12 @@ final class SyntheticEngine implements AutoCloseable {
     private int functionsDiscovered = BASE_FUNCTIONS;
 
     SyntheticEngine() {
+        this(System.getenv());
+    }
+
+    /** Deterministic environment seam for tests; production still inspects the launch environment. */
+    SyntheticEngine(Map<String, String> environment) {
+        backend = discoverBackend(Map.copyOf(Objects.requireNonNull(environment, "environment")));
         scheduler.scheduleAtFixedRate(this::advanceAnalysis, 300, 300, TimeUnit.MILLISECONDS);
     }
 
@@ -81,6 +96,7 @@ final class SyntheticEngine implements AutoCloseable {
         return new WorkbenchSnapshot(
                 1,
                 project,
+                backend,
                 analysisState(),
                 List.copyOf(symbols.subList(0, Math.min(18, symbols.size()))),
                 new ListingExtent(
@@ -102,6 +118,56 @@ final class SyntheticEngine implements AutoCloseable {
                         "Decompiler inference · calling convention confirmed"
                 )
         );
+    }
+
+    static BackendState discoverBackend(Map<String, String> environment) {
+        String configuredHome = environment.getOrDefault("GHIDRA_HOME", "").strip();
+        if (configuredHome.isEmpty()) {
+            return new BackendState(
+                    "synthetic-fixture",
+                    "not-configured",
+                    "deterministic",
+                    "Set GHIDRA_HOME to enable the Ghidra sidecar",
+                    List.of("program.read", "debug.trace.read"));
+        }
+        Path home;
+        try {
+            home = Path.of(configuredHome).toAbsolutePath().normalize();
+        } catch (RuntimeException invalidPath) {
+            return invalidBackend(configuredHome);
+        }
+        Path launcher = home.resolve("support").resolve("analyzeHeadless");
+        if (!Files.isRegularFile(launcher) || !Files.isExecutable(launcher)) {
+            return invalidBackend(launcher.toString());
+        }
+        return new BackendState(
+                "ghidra-headless",
+                "detected",
+                readVersion(home),
+                launcher.toString(),
+                List.of());
+    }
+
+    private static BackendState invalidBackend(String launcher) {
+        return new BackendState(
+                "synthetic-fixture",
+                "invalid-home",
+                "unknown",
+                launcher,
+                List.of("program.read", "debug.trace.read"));
+    }
+
+    private static String readVersion(Path home) {
+        try {
+            for (String line : Files.readAllLines(home.resolve("Ghidra").resolve("application.properties"))) {
+                if (line.startsWith("application.version=")) {
+                    return line.substring("application.version=".length()).strip();
+                }
+            }
+        } catch (IOException ignored) {
+            // A customized distribution can still be used when it omits the version property.
+        }
+        return home.getFileName() == null ? "unknown" : home.getFileName().toString();
     }
 
     synchronized AnalysisState startAnalysis() {

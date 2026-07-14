@@ -23,13 +23,14 @@ public final class RunAnalysisAction extends DumbAwareAction {
         }
 
         var session = WorkbenchSession.getInstance(project);
+        var request = session.beginAnalysis();
         new Task.Backgroundable(project, "Analyzing " + session.program().name(), true) {
             private volatile AnalysisResult result;
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 indicator.setIndeterminate(false);
-                result = session.engine().analyze(session.program().id(), new AnalysisMonitor() {
+                result = session.analyze(request, new AnalysisMonitor() {
                     @Override
                     public void checkCancelled() {
                         indicator.checkCanceled();
@@ -46,7 +47,17 @@ public final class RunAnalysisAction extends DumbAwareAction {
 
             @Override
             public void onSuccess() {
-                session.applyAnalysis(result);
+                if (!session.applyAnalysis(request, result)) {
+                    NotificationGroupManager.getInstance()
+                            .getNotificationGroup(NOTIFICATION_GROUP)
+                            .createNotification(
+                                    "Analysis result discarded",
+                                    "Runtime, program, generation, or analysis request changed before completion.",
+                                    NotificationType.WARNING
+                            )
+                            .notify(project);
+                    return;
+                }
                 NotificationGroupManager.getInstance()
                         .getNotificationGroup(NOTIFICATION_GROUP)
                         .createNotification(

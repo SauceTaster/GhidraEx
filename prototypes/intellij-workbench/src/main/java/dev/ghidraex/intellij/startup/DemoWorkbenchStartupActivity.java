@@ -23,6 +23,7 @@ public final class DemoWorkbenchStartupActivity implements StartupActivity.DumbA
     private static final String PROJECTS_TOOL_WINDOW = "RE Projects";
     private static final String SYMBOLS_TOOL_WINDOW = "RE Symbols";
     private static final String INSPECTOR_TOOL_WINDOW = "RE Inspector";
+    private static final String LAB_TOOL_WINDOW = "RE Lab";
 
     @Override
     public void runActivity(@NotNull Project project) {
@@ -52,6 +53,7 @@ public final class DemoWorkbenchStartupActivity implements StartupActivity.DumbA
         show(toolWindows.getToolWindow(PROJECTS_TOOL_WINDOW), false);
         show(toolWindows.getToolWindow(SYMBOLS_TOOL_WINDOW), true);
         show(toolWindows.getToolWindow(INSPECTOR_TOOL_WINDOW), false);
+        show(toolWindows.getToolWindow(LAB_TOOL_WINDOW), false);
 
         // Keep the listing selected after tool-window construction has initialized all providers.
         editorManager.openFile(session.listingFile(), true);
@@ -59,7 +61,8 @@ public final class DemoWorkbenchStartupActivity implements StartupActivity.DumbA
         long visibleToolWindows = Arrays.stream(new String[]{
                         PROJECTS_TOOL_WINDOW,
                         SYMBOLS_TOOL_WINDOW,
-                        INSPECTOR_TOOL_WINDOW
+                        INSPECTOR_TOOL_WINDOW,
+                        LAB_TOOL_WINDOW
                 })
                 .map(toolWindows::getToolWindow)
                 .filter(window -> window != null && window.isVisible())
@@ -68,7 +71,7 @@ public final class DemoWorkbenchStartupActivity implements StartupActivity.DumbA
         int decompilerEditors = editorManager.getAllEditors(session.decompilerFile()).length;
 
         LOG.info("GHIDRAEX_DEMO_READY project=" + project.getBasePath()
-                + " listingRows=" + session.engine().instructionCount(session.program().id())
+                + " listingWindowLimit=512"
                 + " listingEditors=" + listingEditors
                 + " decompilerEditors=" + decompilerEditors
                 + " visibleToolWindows=" + visibleToolWindows);
@@ -77,7 +80,7 @@ public final class DemoWorkbenchStartupActivity implements StartupActivity.DumbA
                 .getNotificationGroup(NOTIFICATION_GROUP)
                 .createNotification(
                         "GhidraEx demo workbench ready",
-                        "Opened the virtualized listing, decompiler, symbols, and inspector.",
+                        "Opened listing, decompiler, symbols, inspector, debugger, scripts, and runtime state.",
                         NotificationType.INFORMATION
                 )
                 .notify(project);

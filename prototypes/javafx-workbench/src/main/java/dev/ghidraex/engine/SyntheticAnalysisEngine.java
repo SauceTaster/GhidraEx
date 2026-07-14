@@ -99,7 +99,10 @@ public final class SyntheticAnalysisEngine implements AnalysisEngine {
     }
 
     @Override
-    public List<String> decompile(String symbolName) {
+    public List<String> decompile(String symbolName, int maxLines) {
+        if (maxLines <= 0) {
+            return List.of();
+        }
         String function = symbolName == null || symbolName.isBlank() ? "parse_packet" : symbolName;
         List<String> lines = new ArrayList<>();
         lines.add("int64_t " + function + "(Packet *packet, Session *session) {");
@@ -133,7 +136,19 @@ public final class SyntheticAnalysisEngine implements AnalysisEngine {
         lines.add("}");
         lines.add("");
         lines.add("// Recovered from 47 basic blocks, confidence 0.94");
-        return List.copyOf(lines);
+        return List.copyOf(lines.subList(0, Math.min(maxLines, lines.size())));
+    }
+
+    @Override
+    public List<Reference> references(long address, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        List<Reference> references = List.of(
+                new Reference(address - 0x28, address, Reference.Kind.CALL),
+                new Reference(address - 0x0c, address, Reference.Kind.FLOW),
+                new Reference(address, address + 0x34, Reference.Kind.DATA));
+        return references.subList(0, Math.min(limit, references.size()));
     }
 
     @Override

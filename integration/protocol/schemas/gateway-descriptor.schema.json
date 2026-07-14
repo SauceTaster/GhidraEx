@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://saucetaster.github.io/ghidraex/protocol/v1/gateway-descriptor.schema.json",
+  "title": "GhidraEx loopback gateway startup descriptor",
+  "description": "Ephemeral out-of-band handoff. Never persist or log this document.",
+  "type": "object",
+  "required": ["baseUrl", "token", "protocolVersion", "pid"],
+  "properties": {
+    "baseUrl": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^http://(127\\.0\\.0\\.1|\\[::1\\]):[1-9][0-9]{0,4}/?$"
+    },
+    "token": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "protocolVersion": {"const": 1},
+    "pid": {"type": "integer", "minimum": 1}
+  },
+  "additionalProperties": false
+}

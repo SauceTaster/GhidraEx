@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "releaseTrain": {
+    "tagPattern": "v<semver>",
+    "coordinatedBefore": "1.0.0",
+    "allowStable": false,
+    "products": [
+      "workbench",
+      "jetbrains",
+      "vscode"
+    ]
+  },
+  "products": {
+    "workbench": {
+      "displayName": "GhidraEx Workbench",
+      "releaseEligible": true,
+      "backendStatus": "deterministic-fixture-only",
+      "artifactStem": "ghidraex-workbench",
+      "platforms": [
+        {
+          "id": "linux-x64",
+          "runner": "ubuntu-24.04",
+          "javafxClassifier": "linux"
+        },
+        {
+          "id": "linux-arm64",
+          "runner": "ubuntu-24.04-arm",
+          "javafxClassifier": "linux-aarch64"
+        },
+        {
+          "id": "windows-x64",
+          "runner": "windows-2025",
+          "javafxClassifier": "win"
+        },
+        {
+          "id": "macos-x64",
+          "runner": "macos-15-intel",
+          "javafxClassifier": "mac"
+        },
+        {
+          "id": "macos-arm64",
+          "runner": "macos-15",
+          "javafxClassifier": "mac-aarch64"
+        }
+      ]
+    },
+    "jetbrains": {
+      "displayName": "GhidraEx for JetBrains",
+      "releaseEligible": true,
+      "backendStatus": "deterministic-fixture-only",
+      "artifactStem": "ghidraex-jetbrains",
+      "platforms": [
+        {
+          "id": "universal",
+          "runner": "ubuntu-24.04"
+        }
+      ]
+    },
+    "vscode": {
+      "displayName": "GhidraEx for VS Code",
+      "releaseEligible": true,
+      "backendStatus": "deterministic-fixture-only",
+      "artifactStem": "ghidraex-vscode",
+      "platforms": [
+        {
+          "id": "universal",
+          "runner": "ubuntu-24.04"
+        }
+      ]
+    },
+    "web": {
+      "displayName": "GhidraEx Web",
+      "releaseEligible": false,
+      "backendStatus": "real-read-only-development-launcher",
+      "blockedBy": "No production hosting, authentication, tenancy, or owned deployment package"
+    },
+    "engine": {
+      "displayName": "GhidraEx Engine",
+      "releaseEligible": false,
+      "backendStatus": "real-read-only-source-tree-runtime",
+      "blockedBy": "No installable engine package, restart policy, resource containment, or compatibility installer"
+    },
+    "sdk": {
+      "displayName": "GhidraEx SDK",
+      "releaseEligible": false,
+      "backendStatus": "not-published",
+      "blockedBy": "Canonical Protobuf v2 schemas and generated clients do not exist yet"
+    }
+  }
+}

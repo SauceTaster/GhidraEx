@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
-import { TOTAL_ROWS, formatAddress } from '../core/engine';
-import { DECOMPILER_SCHEME, LISTING_SCHEME } from '../native/documents';
+import { formatAddress } from '../core/engine';
+import {
+  DECOMPILER_SCHEME,
+  LISTING_SCHEME,
+  LISTING_WINDOW_ROWS,
+  listingGlobalRowForEditorLine,
+  parseNativeDocumentUri,
+} from '../native/documents';
 
 function assert(condition: unknown, detail: string): asserts condition {
   if (!condition) throw new Error(detail);
@@ -32,6 +38,16 @@ export async function run(): Promise<void> {
     'ghidraex.startAnalysis',
     'ghidraex.showXrefs',
     'ghidraex.explainSelection',
+    'ghidraex.debug.start',
+    'ghidraex.debug.stop',
+    'ghidraex.debug.continue',
+    'ghidraex.debug.pause',
+    'ghidraex.debug.showConsole',
+    'ghidraex.scripting.openConsole',
+    'ghidraex.scripting.newScript',
+    'ghidraex.scripting.runActiveScript',
+    'ghidraex.capabilities.selectBackend',
+    'ghidraex.capabilities.copyReport',
   ]) {
     if (!commands.includes(required)) throw new Error(`Missing command: ${required}`);
   }
@@ -45,19 +61,27 @@ export async function run(): Promise<void> {
     'The native decompiler TextDocument did not open.',
   );
 
-  assert(listing.lineCount === TOTAL_ROWS, `Expected ${TOTAL_ROWS} listing lines; got ${listing.lineCount}.`);
+  const listingDescriptor = parseNativeDocumentUri(listing.uri);
+  assert(listingDescriptor?.kind === 'listing', 'The listing URI has no bounded semantic descriptor.');
+  assert(listing.lineCount === listingDescriptor.rowCount, 'The listing content and semantic window disagree.');
+  assert(listing.lineCount <= LISTING_WINDOW_ROWS, `The listing exceeded ${LISTING_WINDOW_ROWS} rows.`);
   assert(listing.lineAt(0).text.startsWith(formatAddress(0)), 'The first native listing address is incorrect.');
   assert(
-    listing.lineAt(TOTAL_ROWS - 1).text.startsWith(formatAddress(TOTAL_ROWS - 1)),
-    'The final native listing address is incorrect.',
+    listing.lineAt(listing.lineCount - 1).text.startsWith(formatAddress(listingDescriptor.startRow + listing.lineCount - 1)),
+    'The bounded listing final address is incorrect.',
   );
   assert(listing.languageId === 'ghidraex-listing', `Unexpected listing language: ${listing.languageId}`);
   assert(decompiler.languageId === 'c', `Unexpected decompiler language: ${decompiler.languageId}`);
   assert(decompiler.getText().includes('payloadLength'), 'The native decompiler content was not populated.');
 
-  const visibleSchemes = new Set(vscode.window.visibleTextEditors.map(editor => editor.document.uri.scheme));
-  assert(visibleSchemes.has(LISTING_SCHEME), 'The listing is not visible in a native editor group.');
-  assert(visibleSchemes.has(DECOMPILER_SCHEME), 'The decompiler is not visible in a native editor group.');
+  await waitFor(
+    () => vscode.window.visibleTextEditors.some(editor => editor.document.uri.scheme === LISTING_SCHEME) ? true : undefined,
+    'The listing is not visible in a native editor group.',
+  );
+  await waitFor(
+    () => vscode.window.visibleTextEditors.some(editor => editor.document.uri.scheme === DECOMPILER_SCHEME) ? true : undefined,
+    'The decompiler is not visible in a native editor group.',
+  );
 
   const symbols = await vscode.commands.executeCommand<readonly vscode.DocumentSymbol[]>(
     'vscode.executeDocumentSymbolProvider',
@@ -114,7 +138,93 @@ export async function run(): Promise<void> {
     'TreeView navigation did not synchronize the native decompiler.',
   );
 
+  // Cross a 4K projection boundary. Editor line zero now represents global row
+  // 8192, proving commands do not equate a native document line with a program row.
+  await vscode.commands.executeCommand('ghidraex.openLocation', { row: 8_192 });
+  const secondProjection = await waitFor(
+    () => vscode.window.visibleTextEditors.find(editor =>
+      editor.document.uri.scheme === LISTING_SCHEME &&
+      listingGlobalRowForEditorLine(editor.document.uri, editor.selection.active.line) === 8_192),
+    'Cross-window navigation did not translate the global row.',
+  );
+  assert(secondProjection.selection.active.line === 0, 'The second listing projection did not restart at editor line zero.');
+  await vscode.commands.executeCommand('ghidraex.openLocation', { row: 2_816 });
+
   await vscode.commands.executeCommand('ghidraex.refreshViews');
+
+  const debugLocations: number[] = [];
+  const debugLocationSubscription = vscode.debug.onDidReceiveDebugSessionCustomEvent(event => {
+    if (event.session.type !== 'ghidraex' || event.event !== 'ghidraex.location') return;
+    const row = (event.body as { readonly row?: unknown } | undefined)?.row;
+    if (typeof row === 'number' && Number.isInteger(row)) debugLocations.push(row);
+  });
+  const debugBreakpoint = new vscode.SourceBreakpoint(new vscode.Location(listing.uri, new vscode.Position(2_820, 0)));
+  vscode.debug.addBreakpoints([debugBreakpoint]);
+  assert(vscode.debug.breakpoints.includes(debugBreakpoint), 'VS Code did not retain the native listing SourceBreakpoint.');
+  const debugStarted = await vscode.commands.executeCommand<boolean>('ghidraex.debug.start');
+  assert(debugStarted === true, 'The native inline debug adapter did not start.');
+  const debugSession = await waitFor(
+    () => vscode.debug.activeDebugSession?.type === 'ghidraex' ? vscode.debug.activeDebugSession : undefined,
+    'The GhidraEx Debug Adapter Protocol session did not become active.',
+  );
+  const breakpointResponse = await debugSession.customRequest('setBreakpoints', {
+    source: { name: 'orbit-controller-v1 listing', path: listing.uri.toString() },
+    breakpoints: [{ line: 2_821 }],
+  }) as { readonly breakpoints?: readonly { readonly verified?: boolean; readonly line?: number }[] };
+  assert(
+    breakpointResponse.breakpoints?.[0]?.verified === true && breakpointResponse.breakpoints[0].line === 2_821,
+    'The inline adapter did not verify the native listing breakpoint.',
+  );
+  const threads = await debugSession.customRequest('threads') as { readonly threads?: readonly { readonly name?: string }[] };
+  assert(threads.threads?.[0]?.name === 'Synthetic trace thread', 'The synthetic native debug thread is missing.');
+  const stack = await debugSession.customRequest('stackTrace', { threadId: 1 }) as {
+    readonly stackFrames?: readonly { readonly name?: string; readonly instructionPointerReference?: string }[];
+  };
+  assert(stack.stackFrames?.[0]?.name !== undefined, 'The native debug stack is empty.');
+  assert(
+    stack.stackFrames?.[0]?.instructionPointerReference?.startsWith('0x') === true,
+    'The native debug frame has no instruction address.',
+  );
+  await waitFor(
+    () => debugLocations.includes(2_816) ? true : undefined,
+    'The synthetic debug session did not publish its entry location.',
+  );
+  const evaluation = await debugSession.customRequest('evaluate', { expression: 'backend', context: 'repl' }) as {
+    readonly result?: string;
+  };
+  assert(evaluation.result?.includes('no process or Ghidra Debugger target') === true, 'Debug backend truth is not visible in the Debug Console contract.');
+  await vscode.commands.executeCommand('ghidraex.debug.continue');
+  await waitFor(
+    () => debugLocations.includes(2_820) ? true : undefined,
+    'Continuing the debug session did not stop at the next listing breakpoint.',
+  );
+  await waitFor(
+    () => vscode.window.visibleTextEditors.find(editor =>
+      editor.document.uri.scheme === LISTING_SCHEME && editor.selection.active.line === 2_820),
+    'Continuing the debug session did not synchronize the next listing breakpoint.',
+  );
+  await vscode.commands.executeCommand('ghidraex.debug.stop');
+  await waitFor(
+    () => vscode.debug.activeDebugSession?.type === 'ghidraex' ? undefined : true,
+    'The GhidraEx debug session did not terminate.',
+  );
+  vscode.debug.removeBreakpoints([debugBreakpoint]);
+  debugLocationSubscription.dispose();
+
+  const scriptDocument = await vscode.workspace.openTextDocument({
+    language: 'ghidraex-script',
+    content: '# Browser-host command script\nprogram\ndecompile decode_packet\nplugins\n',
+  });
+  await vscode.window.showTextDocument(scriptDocument, { preview: false });
+  const scriptPassed = await vscode.commands.executeCommand<boolean>('ghidraex.scripting.runActiveScript');
+  assert(scriptPassed === true, 'The bounded native gx command script did not complete.');
+  await vscode.commands.executeCommand('ghidraex.scripting.openConsole');
+  const scriptTerminal = await waitFor(
+    () => vscode.window.terminals.find(terminal => terminal.name === 'GhidraEx Script Console'),
+    'The native GhidraEx pseudoterminal did not open.',
+  );
+  scriptTerminal.sendText('program');
+  scriptTerminal.sendText('exit');
 
   // Start twice to cover the duplicate-request guard, then cancel through the
   // public command while the first native progress operation is still queued.

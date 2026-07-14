@@ -40,11 +40,18 @@
     "onView:ghidraex.symbols",
     "onView:ghidraex.analysis",
     "onView:ghidraex.evidence",
+    "onView:ghidraex.debugSessions",
+    "onView:ghidraex.scripting",
+    "onView:ghidraex.capabilities",
+    "onDebug:ghidraex",
     "onCommand:ghidraex.openWorkbench",
     "onCommand:ghidraex.jumpToAddress",
     "onCommand:ghidraex.searchSymbols",
     "onCommand:ghidraex.startAnalysis",
-    "onCommand:ghidraex.cancelAnalysis"
+    "onCommand:ghidraex.cancelAnalysis",
+    "onCommand:ghidraex.debug.start",
+    "onCommand:ghidraex.scripting.openConsole",
+    "onCommand:ghidraex.capabilities.selectBackend"
   ],
   "capabilities": {
     "virtualWorkspaces": {
@@ -55,6 +62,8 @@
       "supported": "limited",
       "description": "The synthetic read-only workbench is available. Future local engine launch and writes require trust.",
       "restrictedConfigurations": [
+        "ghidraex.engine.mode",
+        "ghidraex.engine.localPath",
         "ghidraex.engine.endpoint"
       ]
     }
@@ -94,6 +103,24 @@
           "name": "Agent Evidence",
           "icon": "$(references)",
           "contextualTitle": "GhidraEx Agent Evidence"
+        },
+        {
+          "id": "ghidraex.debugSessions",
+          "name": "Debug Sessions",
+          "icon": "$(debug-alt)",
+          "contextualTitle": "GhidraEx Debug Sessions"
+        },
+        {
+          "id": "ghidraex.scripting",
+          "name": "Scripting & REPL",
+          "icon": "$(terminal)",
+          "contextualTitle": "GhidraEx Scripting and REPL"
+        },
+        {
+          "id": "ghidraex.capabilities",
+          "name": "Capabilities & Plugins",
+          "icon": "$(extensions)",
+          "contextualTitle": "GhidraEx Capabilities and Plugins"
         }
       ]
     },
@@ -101,6 +128,10 @@
       {
         "view": "ghidraex.evidence",
         "contents": "Evidence is read-only until a program location is selected.\n[Open the native workbench](command:ghidraex.openWorkbench)"
+      },
+      {
+        "view": "ghidraex.capabilities",
+        "contents": "Real backend readiness is reported here without synthetic substitution.\n[Select backend contract](command:ghidraex.capabilities.selectBackend)"
       }
     ],
     "commands": [
@@ -169,6 +200,90 @@
         "title": "Open Location",
         "category": "GhidraEx",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "ghidraex.debug.start",
+        "title": "Start Synthetic Debug Session",
+        "category": "GhidraEx: Debug",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "ghidraex.debug.stop",
+        "title": "Stop Debug Session",
+        "category": "GhidraEx: Debug",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "ghidraex.debug.continue",
+        "title": "Continue Debug Session",
+        "category": "GhidraEx: Debug",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "ghidraex.debug.pause",
+        "title": "Pause Debug Session",
+        "category": "GhidraEx: Debug",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "ghidraex.debug.showConsole",
+        "title": "Show Debug Console",
+        "category": "GhidraEx: Debug",
+        "icon": "$(debug-console)"
+      },
+      {
+        "command": "ghidraex.scripting.openConsole",
+        "title": "Open Script Console",
+        "category": "GhidraEx: Scripting",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "ghidraex.scripting.newScript",
+        "title": "New Script",
+        "category": "GhidraEx: Scripting",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "ghidraex.scripting.runActiveScript",
+        "title": "Run Active Script",
+        "category": "GhidraEx: Scripting",
+        "icon": "$(run)"
+      },
+      {
+        "command": "ghidraex.scripting.showOutput",
+        "title": "Show Script Output",
+        "category": "GhidraEx: Scripting",
+        "icon": "$(output)"
+      },
+      {
+        "command": "ghidraex.scripting.clearHistory",
+        "title": "Clear Script History",
+        "category": "GhidraEx: Scripting",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "ghidraex.capabilities.selectBackend",
+        "title": "Select Backend Contract",
+        "category": "GhidraEx: Backend",
+        "icon": "$(server-environment)"
+      },
+      {
+        "command": "ghidraex.capabilities.openSettings",
+        "title": "Open Backend Settings",
+        "category": "GhidraEx: Backend",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "ghidraex.capabilities.copyReport",
+        "title": "Copy Capability Report",
+        "category": "GhidraEx: Backend",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "ghidraex.capabilities.inspectPlugin",
+        "title": "Inspect Plugin Capability",
+        "category": "GhidraEx: Backend",
+        "icon": "$(extensions)"
       }
     ],
     "menus": {
@@ -179,6 +294,10 @@
         },
         {
           "command": "ghidraex.openLocation",
+          "when": "false"
+        },
+        {
+          "command": "ghidraex.capabilities.inspectPlugin",
           "when": "false"
         }
       ],
@@ -207,6 +326,56 @@
           "command": "ghidraex.explainSelection",
           "when": "view == ghidraex.evidence",
           "group": "navigation"
+        },
+        {
+          "command": "ghidraex.debug.start",
+          "when": "view == ghidraex.debugSessions && !ghidraex.debugActive",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.debug.continue",
+          "when": "view == ghidraex.debugSessions && ghidraex.debugStopped",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.debug.pause",
+          "when": "view == ghidraex.debugSessions && ghidraex.debugActive && !ghidraex.debugStopped",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.debug.stop",
+          "when": "view == ghidraex.debugSessions && ghidraex.debugActive",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ghidraex.scripting.openConsole",
+          "when": "view == ghidraex.scripting",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.scripting.newScript",
+          "when": "view == ghidraex.scripting",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ghidraex.scripting.clearHistory",
+          "when": "view == ghidraex.scripting",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ghidraex.capabilities.selectBackend",
+          "when": "view == ghidraex.capabilities",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ghidraex.capabilities.copyReport",
+          "when": "view == ghidraex.capabilities",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ghidraex.capabilities.openSettings",
+          "when": "view == ghidraex.capabilities",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -219,6 +388,16 @@
           "command": "ghidraex.showXrefs",
           "when": "viewItem == ghidraex.symbol || viewItem == ghidraex.evidence",
           "group": "navigation"
+        },
+        {
+          "command": "ghidraex.openLocation",
+          "when": "viewItem == ghidraex.debugLocation",
+          "group": "inline"
+        },
+        {
+          "command": "ghidraex.capabilities.inspectPlugin",
+          "when": "viewItem =~ /ghidraex.plugin./",
+          "group": "inline"
         }
       ],
       "editor/title": [
@@ -236,6 +415,16 @@
           "command": "ghidraex.startAnalysis",
           "when": "resourceScheme == ghidraex-listing && !ghidraex.analysisRunning",
           "group": "navigation"
+        },
+        {
+          "command": "ghidraex.debug.start",
+          "when": "resourceScheme == ghidraex-listing && !ghidraex.debugActive",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ghidraex.scripting.runActiveScript",
+          "when": "editorLangId == ghidraex-script",
+          "group": "navigation@1"
         }
       ],
       "editor/context": [
@@ -248,6 +437,16 @@
           "command": "ghidraex.explainSelection",
           "when": "resourceScheme == ghidraex-listing || resourceScheme == ghidraex-decompiler",
           "group": "navigation@2"
+        },
+        {
+          "command": "ghidraex.debug.start",
+          "when": "resourceScheme == ghidraex-listing && !ghidraex.debugActive",
+          "group": "navigation@3"
+        },
+        {
+          "command": "ghidraex.scripting.runActiveScript",
+          "when": "editorLangId == ghidraex-script",
+          "group": "navigation@1"
         }
       ]
     },
@@ -270,6 +469,56 @@
         "when": "resourceScheme == ghidraex-listing || resourceScheme == ghidraex-decompiler"
       }
     ],
+    "debuggers": [
+      {
+        "type": "ghidraex",
+        "label": "GhidraEx Synthetic Trace",
+        "languages": [
+          "ghidraex-listing"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "backend": {
+                "type": "string",
+                "enum": [
+                  "synthetic"
+                ],
+                "default": "synthetic",
+                "description": "Only the deterministic synthetic DAP adapter is implemented in this prototype."
+              },
+              "row": {
+                "type": "number",
+                "default": 448,
+                "minimum": 0,
+                "maximum": 99999,
+                "description": "Initial synthetic instruction row."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": true,
+                "description": "Stop the synthetic trace at its initial row."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ghidraex",
+            "request": "launch",
+            "name": "Debug GhidraEx synthetic trace",
+            "backend": "synthetic",
+            "row": 448,
+            "stopOnEntry": true
+          }
+        ]
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "ghidraex-listing"
+      }
+    ],
     "languages": [
       {
         "id": "ghidraex-listing",
@@ -280,6 +529,17 @@
         "extensions": [
           ".gxasm"
         ]
+      },
+      {
+        "id": "ghidraex-script",
+        "aliases": [
+          "GhidraEx Command Script",
+          "gxscript"
+        ],
+        "extensions": [
+          ".gxscript"
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -287,6 +547,11 @@
         "language": "ghidraex-listing",
         "scopeName": "source.ghidraex-listing",
         "path": "./syntaxes/ghidraex.tmLanguage.json"
+      },
+      {
+        "language": "ghidraex-script",
+        "scopeName": "source.ghidraex-script",
+        "path": "./syntaxes/ghidraex-script.tmLanguage.json"
       }
     ],
     "configurationDefaults": {
@@ -297,6 +562,12 @@
         "editor.bracketPairColorization.enabled": false,
         "editor.guides.indentation": false,
         "editor.minimap.enabled": true
+      },
+      "[ghidraex-script]": {
+        "editor.wordWrap": "off",
+        "editor.minimap.enabled": false,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2
       }
     },
     "configuration": {
@@ -307,10 +578,32 @@
           "default": false,
           "description": "Open the native Listing/Decompiler split and reveal the GhidraEx Activity Bar container when the extension host starts."
         },
+        "ghidraex.engine.mode": {
+          "type": "string",
+          "enum": [
+            "synthetic",
+            "local",
+            "remote"
+          ],
+          "enumDescriptions": [
+            "Use the deterministic in-process prototype engine.",
+            "Request a desktop Ghidra JVM bridge. The bridge is not implemented yet.",
+            "Request an authenticated remote HTTPS Ghidra service. The transport is not implemented yet."
+          ],
+          "default": "synthetic",
+          "description": "Requested engine contract. Unavailable real modes remain visible and use an explicit synthetic fallback."
+        },
+        "ghidraex.engine.localPath": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Path to a local Ghidra installation for a future trusted desktop JVM bridge. Setting a path does not make the pending bridge available."
+        },
         "ghidraex.engine.endpoint": {
           "type": "string",
           "default": "",
-          "description": "Reserved HTTPS endpoint for a future remote Ghidra engine."
+          "scope": "resource",
+          "description": "Authenticated HTTPS endpoint for a future remote Ghidra engine. Credentials must not be embedded in this URL."
         }
       }
     }
@@ -319,7 +612,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "build": "npm run check && node esbuild.mjs",
-    "package": "npm run check && node esbuild.mjs --production && vsce package --out dist/ghidraex-vscode-workbench-0.1.0.vsix",
+    "package": "npm run check && node esbuild.mjs --production && vsce package --out dist/ghidraex-vscode-workbench.vsix",
     "open:desktop": "npm run build && node scripts/launch-desktop.mjs",
     "open:web": "npm run build && vscode-test-web --browserType=chromium --port=31048 --extensionDevelopmentPath=. test-fixtures",
     "test:web": "npm run build && vscode-test-web --browserType=chromium --port=31047 --extensionDevelopmentPath=. --extensionTestsPath=dist/web-test/index.js test-fixtures"

@@ -12,6 +12,8 @@ final class WorkbenchJson {
                 .append("\"apiVersion\":").append(snapshot.apiVersion()).append(',')
                 .append("\"project\":");
         project(json, snapshot.project());
+        json.append(',').append("\"backend\":");
+        backend(json, snapshot.backend());
         json.append(',').append("\"analysis\":");
         analysis(json, snapshot.analysis());
         json.append(',').append("\"symbols\":");
@@ -86,6 +88,20 @@ final class WorkbenchJson {
                 .append("\"imageBase\":").append(quote(project.imageBase())).append(',')
                 .append("\"sha256\":").append(quote(project.sha256()))
                 .append('}');
+    }
+
+    private static void backend(StringBuilder json, SyntheticEngine.BackendState backend) {
+        json.append('{')
+                .append("\"mode\":").append(quote(backend.mode())).append(',')
+                .append("\"health\":").append(quote(backend.health())).append(',')
+                .append("\"version\":").append(quote(backend.version())).append(',')
+                .append("\"launcher\":").append(quote(backend.launcher())).append(',')
+                .append("\"capabilities\":[");
+        for (int index = 0; index < backend.capabilities().size(); index++) {
+            if (index > 0) json.append(',');
+            json.append(quote(backend.capabilities().get(index)));
+        }
+        json.append("]}");
     }
 
     private static void analysis(StringBuilder json, SyntheticEngine.AnalysisState state) {

@@ -1,9 +1,8 @@
 package dev.ghidraex.fx;
 
 import dev.ghidraex.engine.AnalysisEngine;
-import dev.ghidraex.engine.AnalysisJob;
 import dev.ghidraex.engine.AnalysisProgress;
-import javafx.application.Platform;
+import dev.ghidraex.engine.ProgramInfo;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -12,18 +11,20 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 
-final class TaskBar extends HBox {
-    private final AnalysisEngine engine;
+final class TaskBar extends HBox implements AutoCloseable {
+    private final AsyncAnalysisLauncher launcher;
     private final Label state = new Label("Ready");
     private final Label phase = new Label();
     private final ProgressBar progress = new ProgressBar();
     private final Button cancel = new Button("Cancel");
     private final Button analyze = new Button("Run analysis");
     private final HBox runningGroup;
-    private AnalysisJob running;
+    private final Runnable analysisChanged;
+    private AsyncAnalysisLauncher.RunHandle running;
 
-    TaskBar(AnalysisEngine engine) {
-        this.engine = engine;
+    TaskBar(AnalysisEngine engine, ProgramInfo program, Runnable analysisChanged) {
+        launcher = AsyncAnalysisLauncher.createFx(engine);
+        this.analysisChanged = analysisChanged == null ? () -> { } : analysisChanged;
         getStyleClass().add("task-bar");
         setAlignment(Pos.CENTER_LEFT);
         setSpacing(10);
@@ -31,7 +32,7 @@ final class TaskBar extends HBox {
         Label statusDot = new Label("●");
         statusDot.getStyleClass().add("status-dot");
         state.getStyleClass().add("status-label");
-        Label model = new Label(engine.program().architecture());
+        Label model = new Label(program.architecture());
         model.getStyleClass().add("status-metadata");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -53,7 +54,7 @@ final class TaskBar extends HBox {
     }
 
     void runAnalysis() {
-        if (running != null && !running.completion().isDone()) {
+        if (running != null && !running.terminal()) {
             return;
         }
         state.setText("Analyzing");
@@ -63,16 +64,25 @@ final class TaskBar extends HBox {
         phase.setText("Preparing analyzers");
         progress.setProgress(0);
 
-        running = engine.startAnalysis(update -> Platform.runLater(() -> updateProgress(update)));
-        AnalysisJob launched = running;
-        launched.completion().whenComplete((unused, error) -> Platform.runLater(() -> finishAnalysis(launched, error)));
+        running = launcher.start(this::updateRun);
     }
 
     private void cancelAnalysis() {
-        if (running != null && !running.completion().isDone()) {
+        if (running != null && !running.terminal()) {
             phase.setText("Cancelling…");
             cancel.setDisable(true);
             running.cancel();
+        }
+    }
+
+    private void updateRun(AsyncAnalysisLauncher.Snapshot snapshot) {
+        if (snapshot.progress() != null) {
+            updateProgress(snapshot.progress());
+        }
+        if (snapshot.state().terminal()) {
+            finishAnalysis(snapshot);
+        } else if (snapshot.state() == AsyncAnalysisLauncher.State.STARTING) {
+            phase.setText("Preparing analyzers");
         }
     }
 
@@ -82,16 +92,26 @@ final class TaskBar extends HBox {
         cancel.setDisable(!update.cancellable());
     }
 
-    private void finishAnalysis(AnalysisJob job, Throwable error) {
-        if (running != job) {
-            return;
-        }
-        boolean wasCancelled = job.isCancelled();
-        state.setText(error != null ? "Analysis failed" : wasCancelled ? "Analysis cancelled" : "Analysis current");
+    private void finishAnalysis(AsyncAnalysisLauncher.Snapshot snapshot) {
+        boolean wasCancelled = snapshot.state() == AsyncAnalysisLauncher.State.CANCELLED;
+        state.setText(switch (snapshot.state()) {
+            case CURRENT -> "Analysis current";
+            case CANCELLED -> "Analysis cancelled";
+            case FAILED -> "Analysis failed";
+            default -> "Analyzing";
+        });
         runningGroup.setVisible(false);
         runningGroup.setManaged(false);
         cancel.setDisable(false);
         analyze.setDisable(false);
         analyze.setText(wasCancelled ? "Run analysis" : "Re-run analysis");
+        if (snapshot.state() == AsyncAnalysisLauncher.State.CURRENT) {
+            analysisChanged.run();
+        }
+    }
+
+    @Override
+    public void close() {
+        launcher.close();
     }
 }

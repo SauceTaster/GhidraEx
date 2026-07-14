@@ -1,7 +1,6 @@
 package dev.ghidraex.fx;
 
-import dev.ghidraex.engine.AnalysisEngine;
-import javafx.collections.FXCollections;
+import dev.ghidraex.viewstate.ContextualReadSlot.Snapshot;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -18,39 +17,63 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-final class DecompilerPane extends BorderPane {
+final class DecompilerPane extends BorderPane implements AutoCloseable {
     private static final Pattern TOKENS = Pattern.compile(
             "\"(?:\\\\.|[^\"\\\\])*\"|//.*|0x[0-9a-fA-F]+|\\b\\d+\\b|[A-Za-z_][A-Za-z0-9_]*|\\s+|.");
     private static final Set<String> KEYWORDS = Set.of(
             "if", "else", "switch", "case", "default", "return", "int64_t", "uint32_t", "uint16_t",
             "uint8_t", "int", "void", "struct", "while", "for");
 
-    private final AnalysisEngine engine;
+    private final AsyncEngineReads.ReadHandle<AsyncEngineReads.DecompilerQuery, AsyncEngineReads.DecompiledFunction>
+            decompilerReads;
     private final Label functionName = new Label();
     private final Label signature = new Label();
-    private final ListView<CodeLine> code = new ListView<>();
+    private final Label state = new Label("● EMPTY");
+    private final Label placeholder = new Label("Loading decompiler output…");
+    private final ListView<AsyncEngineReads.SourceLine> code = new ListView<>();
+    private String displayedResultId = "";
 
-    DecompilerPane(AnalysisEngine engine) {
-        this.engine = engine;
+    DecompilerPane(AsyncEngineReads reads) {
+        decompilerReads = java.util.Objects.requireNonNull(reads, "reads").openDecompiler(this::applyDecompiler);
         getStyleClass().add("decompiler-pane");
         setTop(buildToolbar());
         code.getStyleClass().add("decompiler-list");
         code.setFixedCellSize(25);
         code.setCellFactory(ignored -> new CodeCell());
+        code.setPlaceholder(placeholder);
         setCenter(code);
         showSymbol("parse_packet");
     }
 
     void showSymbol(String symbol) {
-        String safe = symbol == null || symbol.isBlank() ? "parse_packet" : symbol;
-        functionName.setText(safe);
+        AsyncEngineReads.DecompilerQuery query = AsyncEngineReads.DecompilerQuery.from(symbol);
+        functionName.setText(query.symbol());
         signature.setText("int64_t  (Packet *, Session *)");
-        var lines = engine.decompile(safe);
-        code.setItems(FXCollections.observableArrayList(
-                java.util.stream.IntStream.range(0, lines.size())
-                        .mapToObj(index -> new CodeLine(index + 1, lines.get(index)))
-                        .toList()));
-        code.scrollTo(0);
+        decompilerReads.submit(query);
+    }
+
+    private void applyDecompiler(
+            Snapshot<AsyncEngineReads.DecompilerQuery, AsyncEngineReads.DecompiledFunction> snapshot) {
+        ReadStatePresentation.apply(state, code, snapshot, "Decompiler output");
+        placeholder.setText(switch (snapshot.freshness()) {
+            case LOADING -> "Loading decompiler output…";
+            case FAILED -> "Decompiler request failed";
+            case RESYNCING -> "Waiting for a validated program snapshot";
+            default -> "No decompiler output";
+        });
+        var displayed = snapshot.displayed();
+        if (displayed == null) {
+            if (!displayedResultId.isEmpty()) {
+                displayedResultId = "";
+                code.getItems().clear();
+            }
+            return;
+        }
+        if (!displayed.resultId().equals(displayedResultId)) {
+            displayedResultId = displayed.resultId();
+            code.getItems().setAll(displayed.value().lines());
+            code.scrollTo(0);
+        }
     }
 
     private HBox buildToolbar() {
@@ -62,20 +85,23 @@ final class DecompilerPane extends BorderPane {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Label confidence = new Label("94% confidence");
         confidence.getStyleClass().add("confidence-chip");
+        state.getStyleClass().addAll("state-chip", "query-state");
         Button refresh = new Button("↻");
         refresh.getStyleClass().addAll("icon-button", "navigation-button");
-        refresh.setOnAction(event -> showSymbol(functionName.getText()));
+        refresh.setOnAction(event -> decompilerReads.refresh());
 
-        HBox bar = new HBox(9, badge, functionName, signature, spacer, confidence, refresh);
+        HBox bar = new HBox(9, badge, functionName, signature, spacer, confidence, state, refresh);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.getStyleClass().add("pane-toolbar");
         return bar;
     }
 
-    private record CodeLine(int number, String source) {
+    @Override
+    public void close() {
+        decompilerReads.close();
     }
 
-    private static final class CodeCell extends ListCell<CodeLine> {
+    private static final class CodeCell extends ListCell<AsyncEngineReads.SourceLine> {
         private final Label lineNumber = new Label();
         private final TextFlow flow = new TextFlow();
         private final HBox row = new HBox(14, lineNumber, flow);
@@ -92,7 +118,7 @@ final class DecompilerPane extends BorderPane {
         }
 
         @Override
-        protected void updateItem(CodeLine line, boolean empty) {
+        protected void updateItem(AsyncEngineReads.SourceLine line, boolean empty) {
             super.updateItem(line, empty);
             if (empty || line == null) {
                 setGraphic(null);

@@ -15,6 +15,16 @@ final class ToolWindowSupport {
     }
 
     static void install(ToolWindow toolWindow, JComponent component, String toolbarPlace, String... actionIds) {
+        installContent(toolWindow, component, "", toolbarPlace, actionIds);
+    }
+
+    static void installContent(
+            ToolWindow toolWindow,
+            JComponent component,
+            String displayName,
+            String toolbarPlace,
+            String... actionIds
+    ) {
         var panel = new SimpleToolWindowPanel(true, true);
         var group = new DefaultActionGroup();
         var actionManager = ActionManager.getInstance();
@@ -29,7 +39,7 @@ final class ToolWindowSupport {
         panel.setToolbar(toolbar.getComponent());
         panel.setContent(component);
         toolWindow.getContentManager().addContent(
-                ContentFactory.getInstance().createContent(panel, "", false)
+                ContentFactory.getInstance().createContent(panel, displayName, false)
         );
     }
 }

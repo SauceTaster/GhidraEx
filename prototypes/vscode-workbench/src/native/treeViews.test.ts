@@ -37,6 +37,8 @@ vi.mock('vscode', () => {
 });
 
 import { SyntheticEngine } from '../core/engine';
+import { NativeReadService, SyntheticReadTransport } from '../core/readService';
+import type { ViewContext } from '../core/viewState';
 import {
   AnalysisTreeProvider,
   EvidenceTreeProvider,
@@ -45,9 +47,17 @@ import {
 } from './treeViews';
 
 describe('native tree providers', () => {
-  it('exposes a project, program, and native memory sections', () => {
+  const context: ViewContext = {
+    runtimeId: 'runtime-local', runtimeEpoch: 3, programId: 'orbit-controller-v1', contentGeneration: 17,
+  };
+  const reads = (): NativeReadService => {
     const engine = new SyntheticEngine();
-    const provider = new ProjectTreeProvider(engine.openProgram());
+    return new NativeReadService(new SyntheticReadTransport(engine), context);
+  };
+
+  it('exposes a project, program, and native memory sections', async () => {
+    const provider = new ProjectTreeProvider(reads());
+    await provider.refreshFromTransport();
     const workspace = provider.getChildren()[0];
     expect(workspace?.kind).toBe('workspace');
 
@@ -59,11 +69,13 @@ describe('native tree providers', () => {
     expect(provider.getTreeItem(sections[1]!).contextValue).toBe('ghidraex.sectionMetadata');
   });
 
-  it('groups symbols and refreshes its native filter model', () => {
-    const provider = new SymbolsTreeProvider(new SyntheticEngine());
+  it('groups symbols and refreshes its native filter model', async () => {
+    const provider = new SymbolsTreeProvider(reads());
+    await provider.refreshFromTransport();
     expect(provider.getChildren().map(node => node.kind)).toEqual(['group', 'group', 'group']);
 
     provider.setFilter('packet');
+    await provider.refreshFromTransport();
     const group = provider.getChildren()[0];
     expect(group).toMatchObject({ kind: 'group', label: 'Functions', count: 1 });
     expect(provider.getChildren(group)[0]).toMatchObject({
@@ -97,6 +109,16 @@ describe('native tree providers', () => {
 
   it('presents findings and hypotheses with navigable evidence locations', () => {
     const provider = new EvidenceTreeProvider();
+    provider.setEvidence([
+      {
+        id: 'length-guard', kind: 'finding', title: 'Length guard dominates decode',
+        detail: 'payloadLength is bounded.', confidence: 0.92, row: 452,
+      },
+      {
+        id: 'signedness', kind: 'hypothesis', title: 'Possible signedness issue',
+        detail: 'Review widening.', confidence: 0.68, row: 449,
+      },
+    ]);
     const roots = provider.getChildren();
     expect(roots).toHaveLength(2);
     expect(roots.map(node => node.kind === 'evidence' ? node.evidence.kind : undefined)).toEqual(['finding', 'hypothesis']);
